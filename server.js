@@ -1,4 +1,4 @@
-require('dotenv').config(); 
+require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -23,8 +23,8 @@ let accessToken = null;
 let tokenExpiry = null;
 
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
@@ -36,19 +36,19 @@ async function authenticateWithSchwab() {
       throw new Error('Schwab API credentials not configured');
     }
 
-    const response = await axios.post(\`\${SCHWAB_API_BASE}/trader/v1/oauth/token\`, 
+    const response = await axios.post(\'\${SCHWAB_API_BASE}/trader/v1/oauth/token\',
       new URLSearchParams({
         grant_type: 'client_credentials',
         client_id: CLIENT_ID,
         client_secret: CLIENT_SECRET
-      }), 
+      }),
       {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
       }
     );
-    
+
     accessToken = response.data.access_token;
     tokenExpiry = Date.now() + (response.data.expires_in * 1000);
     console.log('Schwab API authentication successful');
@@ -68,18 +68,18 @@ async function getMarketData(symbol) {
     if (!isTokenValid()) {
       await authenticateWithSchwab();
     }
-    
-    const response = await axios.get(\`\${SCHWAB_API_BASE}/marketdata/v1/quotes\`, {
+
+    const response = await axios.get(\'\${SCHWAB_API_BASE}/marketdata/v1/quotes\', {
       params: { symbol },
       headers: {
-        'Authorization': \`Bearer \${accessToken}\`,
+        'Authorization': \'Bearer \${accessToken}\',
         'Accept': 'application/json'
       }
     });
-    
+
     const quote = response.data[symbol];
     if (!quote) {
-      throw new Error(\`No data found for symbol: \${symbol}\`);
+      throw new Error(\'No data found for symbol: \${symbol}\');
     }
 
     return {
@@ -115,7 +115,7 @@ async function getMarketData(symbol) {
 
 function calculateTechnicalIndicators(marketData) {
   const currentPrice = marketData.currentPrice;
-  
+
   return {
     sma20: currentPrice * (0.98 + Math.random() * 0.04),
     rsi: 30 + Math.random() * 40,
@@ -143,21 +143,21 @@ app.get('/api/market-data/:symbol', async (req, res) => {
     const { symbol } = req.params;
     const marketData = await getMarketData(symbol.toUpperCase());
     const indicators = calculateTechnicalIndicators(marketData);
-    
+
     let signal = 'HOLD';
     if (indicators.rsi < 35 && marketData.currentPrice < indicators.sma20) {
       signal = 'BUY';
     } else if (indicators.rsi > 65 && marketData.currentPrice > indicators.sma20) {
       signal = 'SELL';
     }
-    
+
     const response = {
       ...marketData,
       ...indicators,
       signal,
       timestamp: new Date().toISOString()
     };
-    
+
     res.json(response);
   } catch (error) {
     console.error('Market data endpoint error:', error);
@@ -172,10 +172,10 @@ app.post('/api/orders', async (req, res) => {
       return res.status(400).json({ error: 'Missing required order parameters' });
     }
     const result = await simulateOrderPlacement(orderData);
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       ...result,
-      message: 'Order simulated successfully (test mode)' 
+      message: 'Order simulated successfully (test mode)'
     });
   } catch (error) {
     console.error('Order placement error:', error);
@@ -191,7 +191,7 @@ app.get('/api/account/info', async (req, res) => {
       openPositions: Math.floor(Math.random() * 5),
       todaysPnL: (Math.random() - 0.5) * 1000
     };
-    
+
     res.json(accountInfo);
   } catch (error) {
     console.error('Account info error:', error);
@@ -203,10 +203,10 @@ app.delete('/api/orders/cancel/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params;
     const cancelled = Math.floor(Math.random() * 3);
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       cancelled,
-      message: \`Cancelled \${cancelled} orders for \${symbol} (simulated)\` 
+      message: \'Cancelled \${cancelled} orders for \${symbol} (simulated)\'
     });
   } catch (error) {
     console.error('Cancel orders error:', error);
@@ -218,10 +218,10 @@ app.post('/api/orders/stop-loss', async (req, res) => {
   try {
     const orderData = req.body;
     const result = await simulateOrderPlacement({...orderData, orderType: 'STOP'});
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       ...result,
-      message: 'Stop loss order simulated successfully' 
+      message: 'Stop loss order simulated successfully'
     });
   } catch (error) {
     console.error('Stop loss error:', error);
@@ -245,14 +245,14 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(\`🚀 Trading API server running on port \${PORT}\`);
-  console.log(\`📊 Environment: \${process.env.NODE_ENV || 'development'}\`);
+  console.log(\'Trading API server running on port \${PORT}\');
+  console.log(\'Environment: \${process.env.NODE_ENV || 'development'}\');
   if (CLIENT_ID && CLIENT_SECRET) {
     authenticateWithSchwab().catch(err => {
-      console.warn('⚠️  Schwab API not available, running in simulation mode');
+      console.warn('Schwab API not available, running in simulation mode');
     });
   } else {
-    console.warn('⚠️  Schwab credentials not configured, running in simulation mode');
+    console.warn('Schwab credentials not configured, running in simulation mode');
   }
 });
 
