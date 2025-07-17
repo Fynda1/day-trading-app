@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fynda Auto Trading BOT - Schwab Connected</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #0f1419 0%, #1a202c 50%, #2d3748 100%);
+            color: white; padding: 10px; min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px; margin: 0 auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px; padding: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; padding-bottom: 15px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        h1 { font-size: 2.2em; color: #4facfe; }
+        .connection-status {
+            padding: 8px 16px; border-radius: 20px;
+            font-size: 14px; font-weight: bold;
+        }
+        .connection-online { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .connection-offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .connection-demo { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+
+        /* Authentication Panel */
+        .auth-panel {
+            background: rgba(79, 172, 254, 0.1);
+            border: 2px solid #4facfe;
+            border-radius: 15px; padding: 20px; margin-bottom: 20px;
+            text-align: center;
+        }
+        .auth-title { font-size: 1.5em; margin-bottom: 15px; color: #4facfe; }
+        .auth-button {
+            background: #4facfe; color: white; border: none;
+            padding: 12px 24px; border-radius: 8px; font-size: 16px;
+            font-weight: bold; cursor: pointer; margin: 5px;
+            transition: all 0.3s ease;
+        }
+        .auth-button:hover { background: #3b82f6; transform: translateY(-2px); }
+        .auth-step {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px; padding: 15px; margin: 10px 0;
+            text-align: left;
+        }
+
+        .main-grid {
+            display: grid; grid-template-columns: 300px 1fr 260px; gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .left-panel, .center-panel, .right-panel {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px; padding: 15px;
+        }
+
+        .section-title {
+            font-size: 1.3em; margin-bottom: 15px; color: #e2e8f0;
+            border-bottom: 2px solid rgba(79, 172, 254, 0.3); padding-bottom: 8px;
+        }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; color: #cbd5e0; }
+
+        select, input, textarea {
+            width: 100%; padding: 10px; border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px; background: rgba(255, 255, 255, 0.9);
+            color: #1a202c; font-size: 14px;
+        }
+
+        .button-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+        .button-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; }
+
+        .btn {
+            padding: 8px 12px; border: none; border-radius: 6px;
+            font-size: 11px; font-weight: 600; cursor: pointer;
+            transition: all 0.3s ease; text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-buy { background: #10b981; color: white; }
+        .btn-sell { background: #ef4444; color: white; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+
+        .status-indicator {
+            width: 12px; height: 12px; border-radius: 50%; margin-right: 8px;
+        }
+        .status-connected { background: #22c55e; }
+        .status-disconnected { background: #ef4444; }
+
+        /* Hide main interface when not authenticated */
+        .main-content { display: none; }
+        .main-content.authenticated { display: block; }
+
+        .indicators-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 12px; margin-bottom: 15px;
+        }
+        .indicator-card {
+            background: rgba(255, 255, 255, 0.08); padding: 12px;
+            border-radius: 8px; text-align: center;
+        }
+        .indicator-value { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+        .indicator-label { font-size: 11px; opacity: 0.8; }
+
+        .pnl-display {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px; padding: 15px; margin-bottom: 15px;
+        }
+        .pnl-value { font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 8px; }
+        .pnl-positive { color: #22c55e; }
+        .pnl-negative { color: #ef4444; }
+
+        .data-panel {
+            background: rgba(255, 255, 255, 0.05); 
+            border-radius: 10px; padding: 15px; margin-bottom: 15px;
+            max-height: 200px; overflow-y: auto;
+        }
+
+        .data-item {
+            padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 12px;
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Fynda Auto Trading BOT</h1>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-indicator status-disconnected"></span>
+                Not Connected
+            </div>
+        </div>
+
+        <!-- Authentication Panel (shown when not connected) -->
+        <div class="auth-panel" id="authPanel">
+            <div class="auth-title">Connect to Schwab thinkorswim</div>
+            
+            <div class="auth-step">
+                <h3>Step 1: Configure Your API Credentials</h3>
+                <p>Your credentials are pre-configured in schwab-config.js</p>
+                <ul style="text-align: left; margin: 10px 0;">
+                    <li>App Key: 7GkeldTUPQ1zPrOHQRzR8BA3bNfnRGGI</li>
+                    <li>Callback URL: https://day-trading-app-production.up.railway.app/oauth/callback</li>
+                </ul>
+            </div>
+
+            <div class="auth-step">
+                <h3>Step 2: Authorize with Schwab</h3>
+                <p>Click the button below to open Schwab's authorization page in a new window.</p>
+                <button class="auth-button" onclick="startSchwabAuth()">
+                    Connect to Schwab
+                </button>
+            </div>
+
+            <div class="auth-step">
+                <h3>Step 3: Enter Authorization Code</h3>
+                <p>After authorizing, Schwab will redirect you to your callback page with a code. Paste that code here:</p>
+                <input type="text" id="authCode" placeholder="Enter authorization code here..." style="margin: 10px 0;">
+                <button class="auth-button" onclick="completeAuth()">
+                    Complete Connection
+                </button>
+            </div>
+
+            <div class="auth-step" style="background: rgba(251, 191, 36, 0.1);">
+                <h3>Demo Mode</h3>
+                <p>Want to test the interface without connecting to Schwab?</p>
+                <button class="auth-button" onclick="enableDemoMode()" style="background: #fbbf24;">
+                    Continue in Demo Mode
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Trading Interface (hidden until authenticated) -->
+        <div class="main-content" id="mainContent">
+            <div class="main-grid">
+                <div class="left-panel">
+                    <div class="section-title">Trading Controls</div>
+
+                    <div class="form-group">
+                        <label for="ticker">Select Stock:</label>
+                        <select id="ticker" required>
+                            <option value="">Choose a stock...</option>
+                            <option value="AAPL">Apple Inc. (AAPL)</option>
+                            <option value="GOOGL">Alphabet Inc. (GOOGL)</option>
+                            <option value="MSFT">Microsoft Corp. (MSFT)</option>
+                            <option value="AMZN">Amazon.com Inc. (AMZN)</option>
+                            <option value="TSLA">Tesla Inc. (TSLA)</option>
+                            <option value="META">Meta Platforms (META)</option>
+                            <option value="NVDA">NVIDIA Corp. (NVDA)</option>
+                            <option value="SPY">SPDR S&P 500 ETF (SPY)</option>
+                            <option value="QQQ">Invesco QQQ Trust (QQQ)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="quantity">Quantity:</label>
+                        <input type="number" id="quantity" min="1" max="10000" value="100">
+                    </div>
+
+                    <div class="button-grid">
+                        <button class="btn btn-buy" onclick="executeTrade('buy')" id="buyBtn">Buy</button>
+                        <button class="btn btn-sell" onclick="executeTrade('sell')" id="sellBtn">Sell</button>
+                    </div>
+
+                    <div class="button-row">
+                        <button class="btn btn-danger" onclick="logout()" style="font-size: 9px; padding: 6px 8px;">Disconnect</button>
+                        <button class="btn btn-primary" onclick="refreshData()" style="font-size: 9px; padding: 6px 8px;">Refresh</button>
+                        <button class="btn btn-primary" onclick="getAccountInfo()" style="font-size: 9px; padding: 6px 8px;">Account Info</button>
+                    </div>
+
+                    <div class="pnl-display">
+                        <div class="indicator-label">Account Balance</div>
+                        <div class="pnl-value" id="accountBalance">Loading...</div>
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 8px;">
+                            <span>Buying Power: <span id="buyingPower">$0.00</span></span>
+                            <span>Day P&L: <span id="dayPnL">$0.00</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="center-panel">
+                    <div class="section-title">Market Data & Positions</div>
+
+                    <div class="indicators-grid">
+                        <div class="indicator-card">
+                            <div class="indicator-value" id="currentPrice">$0.00</div>
+                            <div class="indicator-label">Current Price</div>
+                        </div>
+                        <div class="indicator-card">
+                            <div class="indicator-value" id="dailyChange">+$0.00</div>
+                            <div class="indicator-label">Daily Change</div>
+                        </div>
+                        <div class="indicator-card">
+                            <div class="indicator-value" id="volume">0</div>
+                            <div class="indicator-label">Volume</div>
+                        </div>
+                    </div>
+
+                    <div class="data-panel">
+                        <h3>Current Positions</h3>
+                        <div id="positionsList">Loading positions...</div>
+                    </div>
+
+                    <div class="data-panel">
+                        <h3>Recent Orders</h3>
+                        <div id="ordersList">Loading orders...</div>
+                    </div>
+                </div>
+
+                <div class="right-panel">
+                    <div class="section-title">Account Status</div>
+                    
+                    <div id="accountStatus" style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                        <p>Account: <span id="accountNumber">Loading...</span></p>
+                        <p>Status: <span id="accountStatusText">Loading...</span></p>
+                        <p>Last Updated: <span id="lastUpdate">Never</span></p>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="testConnection()" style="width: 100%; margin-bottom: 10px;">
+                        Test Connection
+                    </button>
+
+                    <button class="btn btn-primary" onclick="showAdvancedFeatures()" style="width: 100%;">
+                        Advanced Features
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include Schwab API Configuration -->
+    <script src="schwab-config.js"></script>
+
+    <script>
+        let isDemoMode = false;
+        let currentTicker = '';
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Fynda Auto Trading BOT initializing...');
+            checkAuthStatus();
+        });
+
+        // Check if user is already authenticated
+        function checkAuthStatus() {
+            if (window.schwabAPI && window.schwabAPI.isAuthenticated()) {
+                console.log('User already authenticated');
+                showMainInterface();
+                loadAccountData();
+                updateConnectionStatus('Connected to Schwab', true);
+            } else {
+                console.log('User not authenticated');
+                showAuthPanel();
+                updateConnectionStatus('Not Connected', false);
+            }
+        }
+
+        // Update connection status display
+        function updateConnectionStatus(text, isConnected) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.innerHTML = `<span class="status-indicator ${isConnected ? 'status-connected' : 'status-disconnected'}"></span>${text}`;
+            
+            if (isConnected) {
+                statusElement.className = 'connection-status connection-online';
+            } else {
+                statusElement.className = 'connection-status connection-offline';
+            }
+        }
+
+        // Show authentication panel
+        function showAuthPanel() {
+            document.getElementById('authPanel').style.display = 'block';
+            document.getElementById('mainContent').classList.remove('authenticated');
+        }
+
+        // Show main interface
+        function showMainInterface() {
+            document.getElementById('authPanel').style.display = 'none';
+            document.getElementById('mainContent').classList.add('authenticated');
+        }
+
+        // Start Schwab authentication process
+        function startSchwabAuth() {
+            if (!window.schwabAPI) {
+                alert('Schwab API not loaded. Please ensure schwab-config.js is included and configured.');
+                return;
+            }
+
+            const authUrl = window.schwabAPI.getAuthorizationUrl();
+            console.log('Opening authorization URL:', authUrl);
+            window.open(authUrl, '_blank', 'width=600,height=700');
+            
+            alert('1. A new window opened with Schwab login\n2. Log in and authorize the app\n3. Copy the authorization code from the redirect URL\n4. Come back here and paste it in the text field');
+        }
+
+        // Complete authentication with authorization code
+        async function completeAuth() {
+            const authCode = document.getElementById('authCode').value.trim();
+            if (!authCode) {
+                alert('Please enter the authorization code');
+                return;
+            }
+
+            try {
+                updateConnectionStatus('Connecting...', false);
+                console.log('Attempting to authenticate with code:', authCode);
+                
+                const success = await window.schwabAPI.getTokens(authCode);
+                if (success) {
+                    console.log('Authentication successful');
+                    showMainInterface();
+                    loadAccountData();
+                    updateConnectionStatus('Connected to Schwab', true);
+                    alert('Successfully connected to Schwab!');
+                } else {
+                    throw new Error('Failed to get tokens');
+                }
+            } catch (error) {
+                console.error('Authentication failed:', error);
+                alert('Authentication failed. Please check your credentials and try again.');
+                updateConnectionStatus('Connection Failed', false);
+            }
+        }
+
+        // Enable demo mode
+        function enableDemoMode() {
+            isDemoMode = true;
+            console.log('Demo mode enabled');
+            showMainInterface();
+            updateConnectionStatus('Demo Mode', false);
+            document.getElementById('connectionStatus').className = 'connection-status connection-demo';
+            
+            // Load demo data
+            document.getElementById('accountBalance').textContent = '$25,000.00';
+            document.getElementById('buyingPower').textContent = '$25,000.00';
+            document.getElementById('accountNumber').textContent = 'DEMO123456';
+            document.getElementById('accountStatusText').textContent = 'Demo Account';
+            document.getElementById('positionsList').innerHTML = 'No positions (Demo Mode)';
+            document.getElementById('ordersList').innerHTML = 'No orders (Demo Mode)';
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        }
+
+        // Load account data from Schwab
+        async function loadAccountData() {
+            if (isDemoMode) return;
+
+            try {
+                console.log('Loading account data...');
+                
+                // Get account info
+                const accounts = await window.schwabAPI.getAccounts();
+                if (accounts && accounts.length > 0) {
+                    const account = accounts[0];
+                    document.getElementById('accountNumber').textContent = account.accountNumber;
+                    document.getElementById('accountStatusText').textContent = account.type || 'Active';
+                    console.log('Account loaded:', account.accountNumber);
+                }
+
+                // Get balance
+                const balance = await window.schwabAPI.getBalance();
+                if (balance) {
+                    document.getElementById('accountBalance').textContent = `$${balance.currentBalances?.liquidationValue?.toLocaleString() || '0.00'}`;
+                    document.getElementById('buyingPower').textContent = `$${balance.currentBalances?.buyingPower?.toLocaleString() || '0.00'}`;
+                    console.log('Balance loaded');
+                }
+
+                // Get positions
+                await loadPositions();
+                
+                // Get orders
+                await loadOrders();
+
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+
+            } catch (error) {
+                console.error('Failed to load account data:', error);
+                alert('Failed to load account data. Please check your connection.');
+            }
+        }
+
+        // Load positions
+        async function loadPositions() {
+            if (isDemoMode) {
+                document.getElementById('positionsList').innerHTML = 'No positions (Demo Mode)';
+                return;
+            }
+
+            try {
+                const positions = await window.schwabAPI.getPositions();
+                const positionsHtml = positions && positions.length > 0 
+                    ? positions.map(pos => `
+                        <div class="data-item">
+                            <strong>${pos.instrument?.symbol || 'N/A'}</strong> - 
+                            ${pos.longQuantity || 0} shares @ 
+                            $${pos.averagePrice?.toFixed(2) || '0.00'}
+                        </div>
+                    `).join('')
+                    : '<div class="data-item">No current positions</div>';
+                
+                document.getElementById('positionsList').innerHTML = positionsHtml;
+            } catch (error) {
+                console.error('Failed to load positions:', error);
+                document.getElementById('positionsList').innerHTML = '<div class="data-item">Error loading positions</div>';
+            }
+        }
+
+        // Load orders
+        async function loadOrders() {
+            if (isDemoMode) {
+                document.getElementById('ordersList').innerHTML = '<div class="data-item">No orders (Demo Mode)</div>';
+                return;
+            }
+
+            try {
+                const orders = await window.schwabAPI.getOrders();
+                const ordersHtml = orders && orders.length > 0 
+                    ? orders.slice(0, 5).map(order => `
+                        <div class="data-item">
+                            <strong>${order.orderLegCollection?.[0]?.instrument?.symbol || 'N/A'}</strong> - 
+                            ${order.orderLegCollection?.[0]?.instruction || 'N/A'} 
+                            ${order.quantity || 0} @ 
+                            ${order.orderType || 'MARKET'} - 
+                            Status: ${order.status || 'UNKNOWN'}
+                        </div>
+                    `).join('')
+                    : '<div class="data-item">No recent orders</div>';
+                
+                document.getElementById('ordersList').innerHTML = ordersHtml;
+            } catch (error) {
+                console.error('Failed to load orders:', error);
+                document.getElementById('ordersList').innerHTML = '<div class="data-item">Error loading orders</div>';
+            }
+        }
+
+        // Get current stock price
+        async function getCurrentPrice() {
+            if (!currentTicker) return 0;
+            
+            if (isDemoMode) {
+                const demoPrice = Math.random() * 100 + 50;
+                document.getElementById('currentPrice').textContent = `$${demoPrice.toFixed(2)}`;
+                return demoPrice;
+            }
+
+            try {
+                const quote = await window.schwabAPI.getQuote(currentTicker);
+                if (quote && quote[currentTicker]) {
+                    const price = quote[currentTicker].lastPrice || 0;
+                    document.getElementById('currentPrice').textContent = `$${price.toFixed(2)}`;
+                    
+                    const change = quote[currentTicker].netChange || 0;
+                    const changeElement = document.getElementById('dailyChange');
+                    changeElement.textContent = `${change >= 0 ? '+' : ''}$${change.toFixed(2)}`;
+                    changeElement.style.color = change >= 0 ? '#22c55e' : '#ef4444';
+                    
+                    document.getElementById('volume').textContent = (quote[currentTicker].totalVolume || 0).toLocaleString();
+                    
+                    return price;
+                }
+            } catch (error) {
+                console.error('Failed to get price:', error);
+            }
+            return 0;
+        }
+
+        // Execute trade
+        async function executeTrade(action) {
+            if (!currentTicker) {
+                alert('Please select a stock first');
+                return;
+            }
+
+            const quantity = parseInt(document.getElementById('quantity').value);
+            if (!quantity || quantity <= 0) {
+                alert('Please enter a valid quantity');
+                return;
+            }
+
+            if (isDemoMode) {
+                alert(`DEMO: ${action.toUpperCase()} ${quantity} shares of ${currentTicker}`);
+                return;
+            }
+
+            try {
+                // Disable buttons during trade
+                document.getElementById('buyBtn').disabled = true;
+                document.getElementById('sellBtn').disabled = true;
+
+                const orderData = {
+                    orderType: 'MARKET',
+                    session: 'NORMAL',
+                    duration: 'DAY',
+                    orderStrategyType: 'SINGLE',
+                    orderLegCollection: [{
+                        instruction: action.toUpperCase() === 'BUY' ? 'BUY' : 'SELL',
+                        quantity: quantity,
+                        instrument: {
+                            symbol: currentTicker,
+                            assetType: 'EQUITY'
+                        }
+                    }]
+                };
+
+                console.log('Placing order:', orderData);
+                const result = await window.schwabAPI.placeOrder(orderData);
+                
+                if (result) {
+                    alert(`${action.toUpperCase()} order placed successfully!`);
+                    await loadOrders(); // Refresh orders
+                    await loadAccountData(); // Refresh account data
+                } else {
+                    throw new Error('Order placement failed');
+                }
+
+            } catch (error) {
+                console.error('Trade failed:', error);
+                alert(`Trade failed: ${error.message}`);
+            } finally {
+                // Re-enable buttons
+                document.getElementById('buyBtn').disabled = false;
+                document.getElementById('sellBtn').disabled = false;
+            }
+        }
+
+        // Test connection
+        async function testConnection() {
+            if (isDemoMode) {
+                alert('Demo Mode - Connection test skipped');
+                return;
+            }
+
+            try {
+                updateConnectionStatus('Testing...', false);
+                const accounts = await window.schwabAPI.getAccounts();
+                if (accounts && accounts.length > 0) {
+                    updateConnectionStatus('Connected to Schwab', true);
+                    alert('Connection test successful!');
+                } else {
+                    throw new Error('No accounts found');
+                }
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                updateConnectionStatus('Connection Failed', false);
+                alert(`Connection test failed: ${error.message}`);
+            }
+        }
+
+        // Refresh all data
+        async function refreshData() {
+            if (isDemoMode) {
+                alert('Demo Mode - Data refreshed');
+                return;
+            }
+
+            try {
+                await loadAccountData();
+                if (currentTicker) {
+                    await getCurrentPrice();
+                }
+                alert('Data refreshed successfully!');
+            } catch (error) {
+                console.error('Refresh failed:', error);
+                alert(`Refresh failed: ${error.message}`);
+            }
+        }
+
+        // Get account info
+        async function getAccountInfo() {
+            if (isDemoMode) {
+                alert('Demo Account Info:\nAccount: DEMO123456\nType: Demo\nStatus: Active');
+                return;
+            }
+
+            try {
+                const accounts = await window.schwabAPI.getAccounts();
+                const balance = await window.schwabAPI.getBalance();
+                
+                let info = 'Account Information:\n\n';
+                if (accounts && accounts.length > 0) {
+                    info += `Account Number: ${accounts[0].accountNumber}\n`;
+                    info += `Account Type: ${accounts[0].type || 'N/A'}\n`;
+                }
+                if (balance) {
+                    info += `Total Value: $${balance.currentBalances?.liquidationValue?.toLocaleString() || '0.00'}\n`;
+                    info += `Buying Power: $${balance.currentBalances?.buyingPower?.toLocaleString() || '0.00'}\n`;
+                    info += `Cash: $${balance.currentBalances?.cashBalance?.toLocaleString() || '0.00'}`;
+                }
+                
+                alert(info);
+            } catch (error) {
+                console.error('Failed to get account info:', error);
+                alert(`Failed to get account info: ${error.message}`);
+            }
+        }
+
+        // Show advanced features (placeholder)
+        function showAdvancedFeatures() {
+            alert('Advanced Features:\n\n- Stop Loss Orders\n- Profit Targets\n- Auto Trading\n- Technical Indicators\n- Portfolio Analytics\n\nComing soon!');
+        }
+
+        // Logout
+        function logout() {
+            if (window.schwabAPI) {
+                window.schwabAPI.logout();
+            }
+            isDemoMode = false;
+            showAuthPanel();
+            updateConnectionStatus('Not Connected', false);
+            
+            // Clear form
+            document.getElementById('authCode').value = '';
+            alert('Disconnected successfully');
+        }
+
+        // Update ticker selection
+        document.getElementById('ticker').addEventListener('change', function() {
+            if (this.value) {
+                currentTicker = this.value;
+                console.log('Selected ticker:', currentTicker);
+                getCurrentPrice();
+            }
+        });
+
+        // Auto-refresh prices every 30 seconds
+        setInterval(() => {
+            if (currentTicker && !isDemoMode) {
+                getCurrentPrice();
+            }
+        }, 30000);
+
+        console.log('Fynda Auto Trading BOT loaded successfully');
+    </script>
+</body>
+</html>
