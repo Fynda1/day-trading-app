@@ -145,7 +145,6 @@
                 }, 2000);
             }).catch(function(err) {
                 console.error('Failed to copy: ', err);
-                // Fallback: select the text
                 const range = document.createRange();
                 range.selectNode(codeElement);
                 window.getSelection().removeAllRanges();
