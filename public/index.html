@@ -463,7 +463,6 @@
     </div>
 
     <script>
-        // Global variables
         let currentTicker = '';
         let isHoldMode = false;
         let emergencyStopActive = false;
@@ -478,7 +477,6 @@
         let scanningInterval = null;
         let priceUpdateInterval = null;
 
-        // Demo market data
         const demoStocks = {
             'AAPL': { price: 185.50, change: 2.15, volume: 55420000 },
             'GOOGL': { price: 2875.20, change: -15.80, volume: 1250000 },
@@ -492,16 +490,14 @@
             'PLTR': { price: 22.80, change: -0.45, volume: 67800000 }
         };
 
-        // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
-            addLog('🚀 Fynda Auto Trading BOT initialized', 'success');
-            addLog('⚡ Running in demo mode - all features available for testing', 'info');
+            addLog('Fynda Auto Trading BOT initialized', 'success');
+            addLog('Running in demo mode - all features available for testing', 'info');
             loadDemoWatchlist();
             startPriceUpdates();
             updateIndicators();
         });
 
-        // Logging function
         function addLog(message, type = 'info') {
             const timestamp = new Date().toLocaleTimeString();
             const logEntry = document.createElement('div');
@@ -516,14 +512,13 @@
             console.log(`[${type.toUpperCase()}] ${message}`);
         }
 
-        // Stock selection handlers
         document.getElementById('ticker').addEventListener('change', function() {
             if (this.value) {
                 currentTicker = this.value;
                 document.getElementById('chartSymbol').textContent = currentTicker;
                 document.getElementById('customTicker').value = '';
                 updateCurrentPrice();
-                addLog(`📊 Selected stock: ${currentTicker}`, 'info');
+                addLog(`Selected stock: ${currentTicker}`, 'info');
             }
         });
 
@@ -534,21 +529,20 @@
                 document.getElementById('ticker').value = '';
                 document.getElementById('chartSymbol').textContent = currentTicker;
                 updateCurrentPrice();
-                addLog(`🎯 Custom ticker: ${currentTicker}`, 'info');
+                addLog(`Custom ticker: ${currentTicker}`, 'info');
             }
         });
 
-        // Trading functions
         function executeTrade(action) {
             if (!currentTicker) {
-                alert('⚠️ Please select a stock first');
-                addLog('❌ Trade failed: No stock selected', 'error');
+                alert('Please select a stock first');
+                addLog('Trade failed: No stock selected', 'error');
                 return;
             }
 
             if (isHoldMode) {
-                alert('🚫 Trading blocked - HOLD mode is active');
-                addLog('⛔ Trade blocked: HOLD mode active', 'warning');
+                alert('Trading blocked - HOLD mode is active');
+                addLog('Trade blocked: HOLD mode active', 'warning');
                 return;
             }
 
@@ -556,7 +550,6 @@
             const currentPrice = getCurrentPrice();
             const tradeValue = (currentPrice * quantity).toFixed(2);
 
-            // Simulate trade execution
             const trade = {
                 id: Date.now(),
                 symbol: currentTicker,
@@ -570,13 +563,11 @@
             activeTrades.push(trade);
             updateActiveTradesList();
 
-            // Update P&L simulation
             const pnlChange = action === 'buy' ? -trade.value : trade.value;
             updatePnL(pnlChange);
 
-            addLog(`💰 DEMO: ${action.toUpperCase()} ${quantity} shares of ${currentTicker} at $${currentPrice} (Total: $${tradeValue})`, 'success');
+            addLog(`DEMO: ${action.toUpperCase()} ${quantity} shares of ${currentTicker} at $${currentPrice} (Total: $${tradeValue})`, 'success');
 
-            // Show success notification
             showTradeNotification(action, quantity, currentTicker, currentPrice);
         }
 
@@ -589,7 +580,7 @@
                 font-weight: bold; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             `;
             notification.innerHTML = `
-                ✅ ${action.toUpperCase()} Order Executed<br>
+                ${action.toUpperCase()} Order Executed<br>
                 ${quantity} shares of ${symbol} @ $${price}
             `;
 
@@ -600,4 +591,24 @@
         function cancelAllOrders() {
             activeTrades.length = 0;
             updateActiveTradesList();
-            addLog('🚫 DEMO: All orders cancelled',
+            addLog('DEMO: All orders cancelled', 'warning');
+            alert('DEMO MODE: All orders cancelled');
+        }
+
+        function closeAllPositions() {
+            activeTrades.length = 0;
+            updateActiveTradesList();
+            addLog('DEMO: All positions closed', 'warning');
+            alert('DEMO MODE: All positions closed');
+        }
+
+        function setStopLoss() {
+            const percent = document.getElementById('stopLossPercent').value;
+            addLog(`DEMO: Stop loss set at ${percent}%`, 'info');
+            alert(`DEMO MODE: Stop loss set at ${percent}%`);
+        }
+
+        function setProfitTarget() {
+            const percent = document.getElementById('profitTargetPercent').value;
+            addLog(`DEMO: Profit target set at ${percent}%`, 'info');
+            alert(`DEMO MODE: Profit target set at
