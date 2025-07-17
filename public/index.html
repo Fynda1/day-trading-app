@@ -295,10 +295,10 @@
                 this.clientSecret = '8bEOqZrayswy1DNG';
                 this.redirectUri = 'https://day-trading-app-production.up.railway.app/oauth/callback';
                 
-                // Schwab API URLs
+                // Schwab API URLs (CORRECTED)
                 this.baseUrl = 'https://api.schwabapi.com';
-                this.authUrl = 'https://api.schwabapi.com/oauth/authorize';
-                this.tokenUrl = 'https://api.schwabapi.com/oauth/token';
+                this.authUrl = 'https://api.schwabapi.com/v1/oauth/authorize';
+                this.tokenUrl = 'https://api.schwabapi.com/v1/oauth/token';
                 
                 // Token storage
                 this.accessToken = localStorage.getItem('schwab_access_token');
@@ -315,8 +315,8 @@
                 const params = new URLSearchParams({
                     client_id: this.clientId,
                     redirect_uri: this.redirectUri,
-                    response_type: 'code',
-                    scope: 'readonly'
+                    response_type: 'code'
+                    // Note: Schwab doesn't require scope parameter in authorization URL
                 });
                 
                 const url = `${this.authUrl}?${params.toString()}`;
