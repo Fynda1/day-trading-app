@@ -37,7 +37,7 @@
 
         .left-panel, .center-panel, .right-panel, .watchlist-panel, .scanner-panel {
             background: rgba(255, 255, 255, 0.08);
-            border-radius: 15px; padding: 20px;
+            border-radius: 15px; padding: 15px;
         }
 
         .section-title {
@@ -55,8 +55,8 @@
         }
         select option { background: #2d3748; color: white; }
 
-        .button-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .button-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .button-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+        .button-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; }
 
         .btn {
             padding: 12px 20px; border: none; border-radius: 8px;
@@ -231,12 +231,12 @@
             color: #22c55e;
         }
         .scanner-code-area {
-            height: 120px; font-family: monospace; font-size: 11px;
-            margin-bottom: 10px; line-height: 1.4;
+            height: 80px; font-family: monospace; font-size: 10px;
+            margin-bottom: 8px; line-height: 1.3;
         }
 
         .scanner-controls {
-            display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;
+            display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;
         }
         .scanner-btn {
             padding: 8px 12px; font-size: 11px; border: none;
@@ -257,11 +257,12 @@
             background: rgba(34, 197, 94, 0.1); border-radius: 4px;
         }
 
-        .watchlist-btn {
-            padding: 6px 10px; font-size: 10px; border: none;
-            border-radius: 6px; cursor: pointer; background: #4facfe;
-            color: white; flex: 1;
+        .watchlist-btn, .scanner-btn {
+            padding: 4px 8px; font-size: 9px; border: none;
+            border-radius: 4px; cursor: pointer; color: white;
         }
+        .watchlist-btn { background: #4facfe; flex: 1; }
+        .scanner-btn { background: #22c55e; }
 
         .scanner-btn.scanning {
             background: #f59e0b;
@@ -315,7 +316,7 @@
             var holdStatusText = document.getElementById('holdStatusText');
 
             if (isHoldMode) {
-                holdBtn.textContent = 'Resume Trading';
+                holdBtn.textContent = 'Resume';
                 holdBtn.className = 'btn btn-warning';
                 holdStatus.className = 'status-indicator status-warning';
                 holdStatusText.textContent = 'HOLD Mode';
@@ -326,7 +327,7 @@
                     addLog('Auto trading paused due to HOLD mode', 'warning');
                 }
             } else {
-                holdBtn.textContent = 'Force HOLD';
+                holdBtn.textContent = 'HOLD';
                 holdBtn.className = 'btn btn-primary';
                 holdStatus.className = 'status-indicator status-inactive';
                 holdStatusText.textContent = 'Trading';
@@ -438,10 +439,10 @@
                     <button class="btn btn-success" onclick="setProfitTarget()">Profit Target</button>
                 </div>
 
-                <div class="button-row" style="margin-top: 10px;">
-                    <button class="btn btn-primary" id="holdBtn" onclick="toggleHoldMode()">Force HOLD</button>
-                    <button class="btn btn-danger" onclick="closeAllPositions()">Close All</button>
-                    <button class="btn btn-secondary" onclick="emergencyStop()">Emergency Stop</button>
+                <div class="button-row" style="margin-top: 8px;">
+                    <button class="btn btn-primary" id="holdBtn" onclick="toggleHoldMode()" style="font-size: 10px;">HOLD</button>
+                    <button class="btn btn-danger" onclick="closeAllPositions()" style="font-size: 10px;">Close All</button>
+                    <button class="btn btn-secondary" onclick="emergencyStop()" style="font-size: 9px;">Emergency</button>
                 </div>
 
                 <div class="automation-panel">
@@ -567,9 +568,9 @@
                 </div>
 
                 <div class="button-row">
-                    <button class="btn btn-primary" onclick="loadStrategy()">Load</button>
-                    <button class="btn btn-secondary" onclick="testStrategy()">Test</button>
-                    <button class="btn btn-danger" onclick="clearStrategy()">Clear</button>
+                    <button class="btn btn-primary" onclick="loadStrategy()" style="font-size: 10px;">Load</button>
+                    <button class="btn btn-secondary" onclick="testStrategy()" style="font-size: 10px;">Test</button>
+                    <button class="btn btn-danger" onclick="clearStrategy()" style="font-size: 10px;">Clear</button>
                 </div>
 
                 <div class="form-group" style="margin-top: 15px;">
@@ -580,7 +581,7 @@
                     <input type="number" id="profitTargetPercent" min="0.1" max="20" step="0.1" value="4">
                 </div>
 
-                <button class="btn btn-primary" onclick="showLogs()" style="width: 100%; margin-top: 15px;">
+                <button class="btn btn-primary" onclick="showLogs()" style="width: 100%; margin-top: 12px; font-size: 10px;">
                     View Logs
                 </button>
 
@@ -613,20 +614,12 @@
 # Example 1 - RSI Oversold:
 # def rsi = RSI(length = 14);
 # def volume_avg = Average(volume, 20);
-# rsi < 30 and volume > volume_avg * 1.5;
-#
-# Example 2 - MACD Bullish:
-# def macd = MACD();
-# def price_sma = Average(close, 20);
-# macd.Value > macd.Avg and close > price_sma;
-#
-# Example 3 - Breakout Pattern:
-# def high20 = Highest(high, 20);
-# def vol_avg = Average(volume, 10);
-# close > high20[1] and volume > vol_avg * 2;"></textarea>
+# rsi < 30 and volume > volume_avg * 1.5;"></textarea>
 
-                    <button class="scanner-btn" id="scanBtn" onclick="startScanning()">Start Scan</button>
-                    <button class="scanner-btn" onclick="stopScanning()">Stop Scan</button>
+                    <div style="display: flex; gap: 4px;">
+                        <button class="scanner-btn" id="scanBtn" onclick="startScanning()" style="flex: 1;">Start Scan</button>
+                        <button class="scanner-btn" onclick="stopScanning()" style="flex: 1;">Stop</button>
+                    </div>
                 </div>
 
                 <div class="scan-status" id="scanStatus">
@@ -1869,7 +1862,7 @@
 
             if (emergencyStopActive) {
                 # FULL EMERGENCY STOP
-                emergencyBtn.textContent = 'Resume All';
+                emergencyBtn.textContent = 'Resume';
                 emergencyBtn.className = 'btn btn-danger';
 
                 # Stop auto trading
