@@ -2,9 +2,9 @@
 class SchwabAPI {
     constructor() {
         // YOU MUST FILL THESE IN WITH YOUR ACTUAL VALUES
-        this.clientId = 'YOUR_APP_KEY_HERE';  // Replace with your App Key
-        this.clientSecret = 'YOUR_APP_SECRET_HERE';  // Replace with your App Secret
-        this.redirectUri = 'YOUR_REDIRECT_URI_HERE';  // Replace with your registered redirect URI
+        this.clientId = '7GkeldTUPQ1zPrOHQRzR8BA3bNfnRGGI';  // Replace with your App Key
+        this.clientSecret = '8bEOqZrayswy1DNG';  // Replace with your App Secret
+        this.redirectUri = ' https://day-trading-app-production.up.railway.app/oauth/callback';  // Replace with your registered redirect URI
         
         // Schwab API URLs
         this.baseUrl = 'https://api.schwabapi.com';
