@@ -434,15 +434,15 @@
                 </div>
 
                 <div class="button-row">
-                    <button class="btn btn-cancel" onclick="cancelAllOrders()">Cancel All</button>
-                    <button class="btn btn-secondary" onclick="setStopLoss()">Stop Loss</button>
-                    <button class="btn btn-success" onclick="setProfitTarget()">Profit Target</button>
+                    <button class="btn btn-cancel" onclick="cancelAllOrders()" style="font-size: 9px; padding: 6px 8px;">Cancel All</button>
+                    <button class="btn btn-secondary" onclick="setStopLoss()" style="font-size: 9px; padding: 6px 8px;">Stop Loss</button>
+                    <button class="btn btn-success" onclick="setProfitTarget()" style="font-size: 9px; padding: 6px 8px;">Profit</button>
                 </div>
 
                 <div class="button-row" style="margin-top: 8px;">
-                    <button class="btn btn-primary" id="holdBtn" onclick="toggleHoldMode()" style="font-size: 10px;">HOLD</button>
-                    <button class="btn btn-danger" onclick="closeAllPositions()" style="font-size: 10px;">Close All</button>
-                    <button class="btn btn-secondary" onclick="emergencyStop()" style="font-size: 9px;">Emergency</button>
+                    <button class="btn btn-primary" id="holdBtn" onclick="toggleHoldMode()" style="font-size: 9px; padding: 6px 8px;">HOLD</button>
+                    <button class="btn btn-danger" onclick="closeAllPositions()">Close All</button>
+                    <button class="btn btn-secondary" onclick="emergencyStop()" style="font-size: 8px; padding: 6px 8px;">Emergency STP</button>
                 </div>
 
                 <div class="automation-panel">
@@ -460,7 +460,7 @@
                             <span id="holdStatusText">Trading</span>
                         </div>
                     </div>
-                    <button class="btn btn-primary" id="toggleAuto" onclick="toggleAutomation()" style="width: 100%;">
+                    <button class="btn btn-primary" id="toggleAuto" onclick="toggleAutomation()" style="width: 100%; font-size: 9px; padding: 6px 8px;">
                         Start Auto Trading
                     </button>
                 </div>
@@ -568,9 +568,9 @@
                 </div>
 
                 <div class="button-row">
-                    <button class="btn btn-primary" onclick="loadStrategy()" style="font-size: 10px;">Load</button>
-                    <button class="btn btn-secondary" onclick="testStrategy()" style="font-size: 10px;">Test</button>
-                    <button class="btn btn-danger" onclick="clearStrategy()" style="font-size: 10px;">Clear</button>
+                    <button class="btn btn-primary" onclick="loadStrategy()" style="font-size: 9px; padding: 6px 8px;">Load</button>
+                    <button class="btn btn-secondary" onclick="testStrategy()" style="font-size: 9px; padding: 6px 8px;">Test</button>
+                    <button class="btn btn-danger" onclick="clearStrategy()" style="font-size: 9px; padding: 6px 8px;">Clear</button>
                 </div>
 
                 <div class="form-group" style="margin-top: 15px;">
@@ -581,7 +581,7 @@
                     <input type="number" id="profitTargetPercent" min="0.1" max="20" step="0.1" value="4">
                 </div>
 
-                <button class="btn btn-primary" onclick="showLogs()" style="width: 100%; margin-top: 12px; font-size: 10px;">
+                <button class="btn btn-primary" onclick="showLogs()" style="width: 100%; margin-top: 12px; font-size: 9px; padding: 6px 8px;">
                     View Logs
                 </button>
 
@@ -617,8 +617,8 @@
 # rsi < 30 and volume > volume_avg * 1.5;"></textarea>
 
                     <div style="display: flex; gap: 4px;">
-                        <button class="scanner-btn" id="scanBtn" onclick="startScanning()" style="flex: 1;">Start Scan</button>
-                        <button class="scanner-btn" onclick="stopScanning()" style="flex: 1;">Stop</button>
+                        <button class="scanner-btn" id="scanBtn" onclick="startScanning()" style="flex: 1; font-size: 8px; padding: 4px 6px;">Start Scan</button>
+                        <button class="scanner-btn" onclick="stopScanning()" style="flex: 1; font-size: 8px; padding: 4px 6px;">Stop</button>
                     </div>
                 </div>
 
@@ -1890,7 +1890,7 @@
 
             } else {
                 # RESUME FROM EMERGENCY
-                emergencyBtn.textContent = 'Emergency Stop';
+                emergencyBtn.textContent = 'Emergency';
                 emergencyBtn.className = 'btn btn-secondary';
 
                 # Deactivate hold mode
