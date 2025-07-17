@@ -3,70 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading API Server</title>
+    <title>Day Trading Interface</title>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 50px auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white; padding: 20px; min-height: 100vh;
         }
         .container {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 1200px; margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px); border-radius: 15px;
+            padding: 30px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
-        .status {
-            background: #e8f5e8;
-            border: 1px solid #4caf50;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 20px 0;
+        h1 { text-align: center; margin-bottom: 30px; font-size: 2.5em; }
+        .trading-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+        .manual-controls, .indicators-panel {
+            background: rgba(255, 255, 255, 0.1); border-radius: 10px;
+            padding: 25px; border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .endpoint {
-            background: #f8f9fa;
-            border-left: 4px solid #007bff;
-            padding: 10px 15px;
-            margin: 10px 0;
-            font-family: monospace;
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #e0e0e0; }
+        select, input[type="number"], textarea {
+            width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px; background: rgba(255, 255, 255, 0.1);
+            color: white; font-size: 16px;
         }
+        .button-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
+        .btn {
+            padding: 15px 25px; border: none; border-radius: 8px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        .btn-buy { background: linear-gradient(45deg, #4CAF50, #45a049); color: white; }
+        .btn-sell { background: linear-gradient(45deg, #f44336, #d32f2f); color: white; }
+        .btn-cancel { background: linear-gradient(45deg, #ff9800, #f57c00); color: white; }
+        .btn-secondary { background: linear-gradient(45deg, #2196F3, #1976D2); color: white; }
+        .indicators-display { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+        .indicator-card {
+            background: rgba(255, 255, 255, 0.1); padding: 15px;
+            border-radius: 8px; text-align: center;
+        }
+        .indicator-value { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+        .indicator-label { font-size: 14px; opacity: 0.8; }
+        .status-panel { background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 20px; margin-top: 20px; }
+        .status-item { display: flex; justify-content: space-between; padding: 10px 0; }
+        .status-green { color: #4CAF50; }
+        .status-red { color: #f44336; }
+        .status-yellow { color: #ff9800; }
+        .signal-display {
+            text-align: center; padding: 20px; border-radius: 10px;
+            margin-top: 20px; font-size: 24px; font-weight: bold;
+        }
+        .signal-buy { background: linear-gradient(45deg, #4CAF50, #45a049); }
+        .signal-sell { background: linear-gradient(45deg, #f44336, #d32f2f); }
+        .signal-hold { background: linear-gradient(45deg, #ff9800, #f57c00); }
+        .connection-status {
+            position: fixed; top: 20px; right: 20px;
+            padding: 10px 20px; border-radius: 20px;
+            font-size: 14px; font-weight: bold;
+        }
+        .connection-online { background: rgba(76, 175, 80, 0.9); color: white; }
+        .connection-offline { background: rgba(244, 67, 54, 0.9); color: white; }
     </style>
 </head>
 <body>
+    <div class="connection-status" id="connectionStatus">Connecting...</div>
     <div class="container">
-        <h1>Trading API Server</h1>
-        <div class="status">
-            <strong>Server is running successfully!</strong>
+        <h1>Day Trading Interface</h1>
+        <div class="trading-panel">
+            <div class="manual-controls">
+                <h2>Manual Trading Controls</h2>
+                <div class="form-group">
+                    <label for="ticker">Select Ticker:</label>
+                    <select id="ticker" required>
+                        <option value="">Choose a stock...</option>
+                        <option value="AAPL">Apple Inc. (AAPL)</option>
+                        <option value="GOOGL">Alphabet Inc. (GOOGL)</option>
+                        <option value="MSFT">Microsoft Corp. (MSFT)</option>
+                        <option value="TSLA">Tesla Inc. (TSLA)</option>
+                        <option value="NVDA">NVIDIA Corp. (NVDA)</option>
+                        <option value="SPY">SPDR S&P 500 ETF (SPY)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="quantity">Quantity:</label>
+                    <input type="number" id="quantity" min="1" max="10000" value="100" required>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn btn-buy" onclick="executeTrade('buy')">Buy</button>
+                    <button type="button" class="btn btn-sell" onclick="executeTrade('sell')">Sell</button>
+                    <button type="button" class="btn btn-cancel" onclick="cancelOrders()">Cancel</button>
+                    <button type="button" class="btn btn-secondary" onclick="setStopLoss()">Stop Loss</button>
+                </div>
+            </div>
+            <div class="indicators-panel">
+                <h2>Technical Indicators</h2>
+                <div class="indicators-display">
+                    <div class="indicator-card">
+                        <div class="indicator-value" id="currentPrice">$0.00</div>
+                        <div class="indicator-label">Current Price</div>
+                    </div>
+                    <div class="indicator-card">
+                        <div class="indicator-value" id="rsi">0.00</div>
+                        <div class="indicator-label">RSI</div>
+                    </div>
+                    <div class="indicator-card">
+                        <div class="indicator-value" id="volume">0</div>
+                        <div class="indicator-label">Volume</div>
+                    </div>
+                </div>
+                <div class="signal-display" id="signalDisplay">
+                    <div id="signalText">HOLD</div>
+                </div>
+            </div>
         </div>
-
-        <h2>Available Endpoints:</h2>
-        <div class="endpoint">GET /api/health</div>
-        <div class="endpoint">GET /api/market-data/:symbol</div>
-        <div class="endpoint">POST /api/orders</div>
-        <div class="endpoint">GET /api/account/info</div>
-        <div class="endpoint">DELETE /api/orders/cancel/:symbol</div>
-        <div class="endpoint">POST /api/orders/stop-loss</div>
-        <div class="endpoint">POST /api/webhook/trading-signal</div>
-
-        <h2>Test Health Check:</h2>
-        <button onclick="testAPI()">Test API Health</button>
-        <div id="result"></div>
-
-        <script>
-            async function testAPI() {
-                try {
-                    const response = await fetch('/api/health');
-                    const data = await response.json();
-                    document.getElementById('result').innerHTML =
-                        `<div class="status">Health Check: ${JSON.stringify(data, null, 2)}</div>`;
-                } catch (error) {
-                    document.getElementById('result').innerHTML =
-                        `<div style="color: red;">Error: ${error.message}</div>`;
-                }
-            }
-        </script>
+        <div class="status-panel">
+            <h2>Trading Status</h2>
+            <div class="status-item">
+                <span>API Status:</span>
+                <span id="apiStatus" class="status-yellow">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span>Account Balance:</span>
+                <span id="accountBalance">$25,000.00</span>
+            </div>
+        </div>
     </div>
+
+    <script>
+        const API_BASE_URL = window.location.origin;
+        let currentTicker = '';
+        let isConnected = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAPIConnection();
+            document.getElementById('ticker').addEventListener('change', function() {
+                currentTicker = this.value;
+                if (currentTicker) updateMarketData(currentTicker);
+            });
+        });
+
+        async function checkAPIConnection() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/health`);
+                if (response.ok) {
+                    isConnected = true;
+                    document.getElementById('connectionStatus').textContent = 'Online';
+                    document.getElementById('connectionStatus').className = 'connection-status connection-online';
+                    document.getElementById('apiStatus').textContent = 'Connected';
+                    document.getElementById('apiStatus').className = 'status-green';
+                }
+            } catch (error) {
+                isConnected = false;
+                document.getElementById('connectionStatus').textContent = 'Offline';
+                document.getElementById('connectionStatus').className = 'connection-status connection-offline';
+                document.getElementById('apiStatus').textContent = 'Disconnected';
+                document.getElementById('apiStatus').className = 'status-red';
+            }
+        }
+
+        async function executeTrade(action) {
+            if (!document.getElementById('ticker').value) {
+                alert('Please select a ticker');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: document.getElementById('ticker').value,
+                        action: action.toUpperCase(),
+                        quantity: parseInt(document.getElementById('quantity').value)
+                    })
+                });
+                const result = await response.json();
+                alert(`Order submitted: ${result.message || 'Success'}`);
+            } catch (error) {
+                alert('Trade failed: ' + error.message);
+            }
+        }
+
+        async function cancelOrders() {
+            if (!currentTicker) {
+                alert('Please select a ticker first');
+                return;
+            }
+            alert('Cancel orders functionality - simulation mode');
+        }
+
+        async function setStopLoss() {
+            const stopPrice = prompt('Enter stop loss price:');
+            if (stopPrice) alert(`Stop loss set at $${stopPrice} - simulation mode`);
+        }
+
+        async function updateMarketData(symbol) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/market-data/${symbol}`);
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('currentPrice').textContent = '$' + data.currentPrice.toFixed(2);
+                    document.getElementById('rsi').textContent = (data.rsi || 0).toFixed(2);
+                    document.getElementById('volume').textContent = (data.volume || 0).toLocaleString();
+                    document.getElementById('signalText').textContent = data.signal || 'HOLD';
+                }
+            } catch (error) {
+                console.error('Market data error:', error);
+            }
+        }
+    </script>
 </body>
 </html>
