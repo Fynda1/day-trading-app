@@ -3,216 +3,732 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Day Trading Interface</title>
+    <title>Advanced Trading System</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            color: white; padding: 20px; min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #0f1419 0%, #1a202c 50%, #2d3748 100%);
+            color: white; padding: 10px; min-height: 100vh;
         }
         .container {
-            max-width: 1200px; margin: 0 auto;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px); border-radius: 15px;
-            padding: 30px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            max-width: 1400px; margin: 0 auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px; padding: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         }
-        h1 { text-align: center; margin-bottom: 30px; font-size: 2.5em; }
-        .trading-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
-        .manual-controls, .indicators-panel {
-            background: rgba(255, 255, 255, 0.1); border-radius: 10px;
-            padding: 25px; border: 1px solid rgba(255, 255, 255, 0.2);
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; padding-bottom: 15px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
         }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: 600; color: #e0e0e0; }
-        select, input[type="number"], textarea {
-            width: 100%; padding: 12px; border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 8px; background: rgba(255, 255, 255, 0.1);
-            color: white; font-size: 16px;
-        }
-        .button-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
-        .btn {
-            padding: 15px 25px; border: none; border-radius: 8px;
-            font-size: 16px; font-weight: 600; cursor: pointer;
-            text-transform: uppercase; letter-spacing: 1px;
-        }
-        .btn-buy { background: linear-gradient(45deg, #4CAF50, #45a049); color: white; }
-        .btn-sell { background: linear-gradient(45deg, #f44336, #d32f2f); color: white; }
-        .btn-cancel { background: linear-gradient(45deg, #ff9800, #f57c00); color: white; }
-        .btn-secondary { background: linear-gradient(45deg, #2196F3, #1976D2); color: white; }
-        .indicators-display { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
-        .indicator-card {
-            background: rgba(255, 255, 255, 0.1); padding: 15px;
-            border-radius: 8px; text-align: center;
-        }
-        .indicator-value { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
-        .indicator-label { font-size: 14px; opacity: 0.8; }
-        .status-panel { background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 20px; margin-top: 20px; }
-        .status-item { display: flex; justify-content: space-between; padding: 10px 0; }
-        .status-green { color: #4CAF50; }
-        .status-red { color: #f44336; }
-        .status-yellow { color: #ff9800; }
-        .signal-display {
-            text-align: center; padding: 20px; border-radius: 10px;
-            margin-top: 20px; font-size: 24px; font-weight: bold;
-        }
-        .signal-buy { background: linear-gradient(45deg, #4CAF50, #45a049); }
-        .signal-sell { background: linear-gradient(45deg, #f44336, #d32f2f); }
-        .signal-hold { background: linear-gradient(45deg, #ff9800, #f57c00); }
+        h1 { font-size: 2.2em; color: #4facfe; }
         .connection-status {
-            position: fixed; top: 20px; right: 20px;
-            padding: 10px 20px; border-radius: 20px;
+            padding: 8px 16px; border-radius: 20px;
             font-size: 14px; font-weight: bold;
         }
-        .connection-online { background: rgba(76, 175, 80, 0.9); color: white; }
-        .connection-offline { background: rgba(244, 67, 54, 0.9); color: white; }
+        .connection-online { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .connection-offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+        .main-grid {
+            display: grid; grid-template-columns: 350px 1fr 300px; gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .left-panel, .center-panel, .right-panel {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px; padding: 20px;
+        }
+
+        .section-title {
+            font-size: 1.3em; margin-bottom: 15px; color: #e2e8f0;
+            border-bottom: 2px solid rgba(79, 172, 254, 0.3); padding-bottom: 8px;
+        }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; color: #cbd5e0; }
+
+        select, input, textarea {
+            width: 100%; padding: 10px; border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px; background: rgba(255, 255, 255, 0.9);
+            color: #1a202c; font-size: 14px;
+        }
+        select option { background: #2d3748; color: white; }
+
+        .button-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .button-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+
+        .btn {
+            padding: 12px 20px; border: none; border-radius: 8px;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .btn-buy { background: #10b981; color: white; }
+        .btn-sell { background: #ef4444; color: white; }
+        .btn-cancel { background: #f59e0b; color: white; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-secondary { background: #6366f1; color: white; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+
+        .automation-panel {
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 10px; padding: 15px; margin-top: 15px;
+        }
+        .automation-status {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px;
+        }
+        .status-indicator {
+            width: 12px; height: 12px; border-radius: 50%;
+        }
+        .status-active { background: #22c55e; }
+        .status-inactive { background: #6b7280; }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px; padding: 15px; margin-bottom: 15px;
+            height: 300px; position: relative;
+        }
+
+        .chart-controls { display: flex; gap: 8px; margin-bottom: 10px; }
+        .chart-btn {
+            padding: 6px 12px; border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1); color: white;
+            border-radius: 6px; cursor: pointer; font-size: 12px;
+        }
+        .chart-btn.active { background: #4facfe; }
+
+        .indicators-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 12px; margin-bottom: 15px;
+        }
+        .indicator-card {
+            background: rgba(255, 255, 255, 0.08); padding: 12px;
+            border-radius: 8px; text-align: center;
+        }
+        .indicator-value { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+        .indicator-label { font-size: 11px; opacity: 0.8; }
+
+        .pnl-display {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px; padding: 15px; margin-bottom: 15px;
+        }
+        .pnl-value { font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 8px; }
+        .pnl-positive { color: #22c55e; }
+        .pnl-negative { color: #ef4444; }
+
+        .trades-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px; padding: 15px; margin-bottom: 15px;
+            max-height: 200px; overflow-y: auto;
+        }
+        .trade-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 12px;
+        }
+
+        .logs-panel {
+            background: rgba(0, 0, 0, 0.3); border-radius: 8px;
+            padding: 15px; height: 250px; overflow-y: auto;
+            font-family: monospace; font-size: 11px;
+            display: none;
+        }
+        .log-entry { margin-bottom: 4px; padding: 2px 0; }
+        .log-info { color: #60a5fa; }
+        .log-success { color: #34d399; }
+        .log-warning { color: #fbbf24; }
+        .log-error { color: #f87171; }
+
+        .signal-display {
+            text-align: center; padding: 15px; border-radius: 10px;
+            font-size: 20px; font-weight: bold; margin-bottom: 15px;
+        }
+        .signal-buy { background: #10b981; }
+        .signal-sell { background: #ef4444; }
+        .signal-hold { background: #f59e0b; }
+
+        .custom-script-area { height: 120px; font-family: monospace; font-size: 12px; }
+
+        @media (max-width: 1200px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
-    <div class="connection-status" id="connectionStatus">Connecting...</div>
     <div class="container">
-        <h1>Day Trading Interface</h1>
-        <div class="trading-panel">
-            <div class="manual-controls">
-                <h2>Manual Trading Controls</h2>
+        <div class="header">
+            <h1>Advanced Trading System</h1>
+            <div class="connection-status" id="connectionStatus">Connecting...</div>
+        </div>
+
+        <div class="main-grid">
+            <div class="left-panel">
+                <div class="section-title">Trading Controls</div>
+
                 <div class="form-group">
-                    <label for="ticker">Select Ticker:</label>
+                    <label for="ticker">Select Stock:</label>
                     <select id="ticker" required>
-                        <option value="">Choose a stock...</option>
-                        <option value="AAPL">Apple Inc. (AAPL)</option>
-                        <option value="GOOGL">Alphabet Inc. (GOOGL)</option>
-                        <option value="MSFT">Microsoft Corp. (MSFT)</option>
-                        <option value="TSLA">Tesla Inc. (TSLA)</option>
-                        <option value="NVDA">NVIDIA Corp. (NVDA)</option>
-                        <option value="SPY">SPDR S&P 500 ETF (SPY)</option>
+                        <option value="">Loading stocks...</option>
                     </select>
                 </div>
+
                 <div class="form-group">
                     <label for="quantity">Quantity:</label>
                     <input type="number" id="quantity" min="1" max="10000" value="100" required>
                 </div>
-                <div class="button-group">
-                    <button type="button" class="btn btn-buy" onclick="executeTrade('buy')">Buy</button>
-                    <button type="button" class="btn btn-sell" onclick="executeTrade('sell')">Sell</button>
-                    <button type="button" class="btn btn-cancel" onclick="cancelOrders()">Cancel</button>
-                    <button type="button" class="btn btn-secondary" onclick="setStopLoss()">Stop Loss</button>
+
+                <div class="button-grid">
+                    <button class="btn btn-buy" onclick="executeTrade('buy')">Buy</button>
+                    <button class="btn btn-sell" onclick="executeTrade('sell')">Sell</button>
+                </div>
+
+                <div class="button-row">
+                    <button class="btn btn-cancel" onclick="cancelAllOrders()">Cancel All</button>
+                    <button class="btn btn-secondary" onclick="setStopLoss()">Stop Loss</button>
+                    <button class="btn btn-success" onclick="setProfitTarget()">Profit Target</button>
+                </div>
+
+                <div class="automation-panel">
+                    <div class="automation-status">
+                        <span>Auto Trading:</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="status-indicator status-inactive" id="autoStatus"></div>
+                            <span id="autoStatusText">Inactive</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="toggleAuto" onclick="toggleAutomation()" style="width: 100%;">
+                        Start Auto Trading
+                    </button>
+                </div>
+
+                <div class="pnl-display">
+                    <div class="indicator-label">Today's P&L</div>
+                    <div class="pnl-value" id="totalPnL">$0.00</div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 8px;">
+                        <span>Realized: <span id="realizedPnL">$0.00</span></span>
+                        <span>Unrealized: <span id="unrealizedPnL">$0.00</span></span>
+                    </div>
+                </div>
+
+                <div class="trades-panel">
+                    <div class="indicator-label" style="margin-bottom: 10px;">Active Trades</div>
+                    <div id="activeTradesList">No active trades</div>
                 </div>
             </div>
-            <div class="indicators-panel">
-                <h2>Technical Indicators</h2>
-                <div class="indicators-display">
+
+            <div class="center-panel">
+                <div class="section-title">Market Analysis</div>
+
+                <div class="chart-controls">
+                    <button class="chart-btn active" data-timeframe="1m">1M</button>
+                    <button class="chart-btn" data-timeframe="5m">5M</button>
+                    <button class="chart-btn" data-timeframe="15m">15M</button>
+                    <button class="chart-btn" data-timeframe="1h">1H</button>
+                </div>
+
+                <div class="chart-container" id="chartContainer">
+                    <canvas id="priceChart" style="width: 100%; height: 100%;"></canvas>
+                </div>
+
+                <div class="indicators-grid">
                     <div class="indicator-card">
                         <div class="indicator-value" id="currentPrice">$0.00</div>
-                        <div class="indicator-label">Current Price</div>
+                        <div class="indicator-label">Price</div>
                     </div>
                     <div class="indicator-card">
                         <div class="indicator-value" id="rsi">0.00</div>
                         <div class="indicator-label">RSI</div>
                     </div>
                     <div class="indicator-card">
+                        <div class="indicator-value" id="macd">0.00</div>
+                        <div class="indicator-label">MACD</div>
+                    </div>
+                    <div class="indicator-card">
                         <div class="indicator-value" id="volume">0</div>
                         <div class="indicator-label">Volume</div>
                     </div>
+                    <div class="indicator-card">
+                        <div class="indicator-value" id="customIndicatorValue">N/A</div>
+                        <div class="indicator-label">Custom</div>
+                    </div>
                 </div>
+
                 <div class="signal-display" id="signalDisplay">
                     <div id="signalText">HOLD</div>
                 </div>
             </div>
-        </div>
-        <div class="status-panel">
-            <h2>Trading Status</h2>
-            <div class="status-item">
-                <span>API Status:</span>
-                <span id="apiStatus" class="status-yellow">Checking...</span>
-            </div>
-            <div class="status-item">
-                <span>Account Balance:</span>
-                <span id="accountBalance">$25,000.00</span>
+
+            <div class="right-panel">
+                <div class="section-title">Custom Strategy</div>
+
+                <div class="form-group">
+                    <label for="customScript">Strategy Code:</label>
+                    <textarea id="customScript" class="custom-script-area" placeholder="Enter your strategy code here"></textarea>
+                </div>
+
+                <div class="button-row">
+                    <button class="btn btn-primary" onclick="loadStrategy()">Load</button>
+                    <button class="btn btn-secondary" onclick="testStrategy()">Test</button>
+                    <button class="btn btn-danger" onclick="clearStrategy()">Clear</button>
+                </div>
+
+                <div class="form-group" style="margin-top: 15px;">
+                    <label for="stopLossPercent">Stop Loss %:</label>
+                    <input type="number" id="stopLossPercent" min="0.1" max="10" step="0.1" value="2">
+
+                    <label for="profitTargetPercent">Profit Target %:</label>
+                    <input type="number" id="profitTargetPercent" min="0.1" max="20" step="0.1" value="4">
+                </div>
+
+                <button class="btn btn-primary" onclick="showLogs()" style="width: 100%; margin-top: 15px;">
+                    View Logs
+                </button>
+
+                <div class="logs-panel" id="logsPanel">
+                    <div id="logEntries"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        const API_BASE_URL = window.location.origin;
-        let currentTicker = '';
-        let isConnected = false;
+        var API_BASE_URL = window.location.origin;
+        var currentTicker = '';
+        var isConnected = false;
+        var isAutoTrading = false;
+        var currentTimeframe = '1m';
+        var customStrategy = '';
+        var priceData = [];
+        var indicators = {};
+        var activeTrades = [];
+        var totalPnL = 0;
+        var realizedPnL = 0;
+        var unrealizedPnL = 0;
+        var autoTradingInterval = null;
+
+        var POPULAR_STOCKS = [
+            'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'CRM',
+            'SPY', 'QQQ', 'IWM', 'DIA', 'ARKK', 'TQQQ', 'SQQQ', 'SPXL', 'UPRO', 'TMF'
+        ];
 
         document.addEventListener('DOMContentLoaded', function() {
-            checkAPIConnection();
-            document.getElementById('ticker').addEventListener('change', function() {
-                currentTicker = this.value;
-                if (currentTicker) updateMarketData(currentTicker);
-            });
+            initializeApp();
         });
 
-        async function checkAPIConnection() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/health`);
-                if (response.ok) {
-                    isConnected = true;
-                    document.getElementById('connectionStatus').textContent = 'Online';
-                    document.getElementById('connectionStatus').className = 'connection-status connection-online';
-                    document.getElementById('apiStatus').textContent = 'Connected';
-                    document.getElementById('apiStatus').className = 'status-green';
+        function initializeApp() {
+            loadStockList();
+            setupEventListeners();
+            checkAPIConnection();
+            startRealTimeUpdates();
+            addLog('System initialized', 'success');
+        }
+
+        function loadStockList() {
+            var tickerSelect = document.getElementById('ticker');
+            tickerSelect.innerHTML = '<option value="">Choose a stock...</option>';
+
+            for (var i = 0; i < POPULAR_STOCKS.length; i++) {
+                var option = document.createElement('option');
+                option.value = POPULAR_STOCKS[i];
+                option.textContent = POPULAR_STOCKS[i];
+                tickerSelect.appendChild(option);
+            }
+
+            addLog('Stock list loaded', 'info');
+        }
+
+        function setupEventListeners() {
+            document.getElementById('ticker').addEventListener('change', function() {
+                currentTicker = this.value;
+                if (currentTicker) {
+                    addLog('Selected ticker: ' + currentTicker, 'info');
+                    updateMarketData(currentTicker);
                 }
-            } catch (error) {
-                isConnected = false;
-                document.getElementById('connectionStatus').textContent = 'Offline';
-                document.getElementById('connectionStatus').className = 'connection-status connection-offline';
-                document.getElementById('apiStatus').textContent = 'Disconnected';
-                document.getElementById('apiStatus').className = 'status-red';
-            }
-        }
+            });
 
-        async function executeTrade(action) {
-            if (!document.getElementById('ticker').value) {
-                alert('Please select a ticker');
-                return;
-            }
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/orders`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        symbol: document.getElementById('ticker').value,
-                        action: action.toUpperCase(),
-                        quantity: parseInt(document.getElementById('quantity').value)
-                    })
+            var chartBtns = document.querySelectorAll('.chart-btn');
+            for (var i = 0; i < chartBtns.length; i++) {
+                chartBtns[i].addEventListener('click', function() {
+                    var allBtns = document.querySelectorAll('.chart-btn');
+                    for (var j = 0; j < allBtns.length; j++) {
+                        allBtns[j].classList.remove('active');
+                    }
+                    this.classList.add('active');
+                    currentTimeframe = this.dataset.timeframe;
+                    addLog('Changed timeframe to: ' + currentTimeframe, 'info');
                 });
-                const result = await response.json();
-                alert(`Order submitted: ${result.message || 'Success'}`);
-            } catch (error) {
-                alert('Trade failed: ' + error.message);
             }
         }
 
-        async function cancelOrders() {
+        function checkAPIConnection() {
+            fetch(API_BASE_URL + '/api/health')
+                .then(function(response) {
+                    if (response.ok) {
+                        isConnected = true;
+                        updateConnectionStatus('Online');
+                        addLog('API connected', 'success');
+                    } else {
+                        throw new Error('API check failed');
+                    }
+                })
+                .catch(function(error) {
+                    isConnected = false;
+                    updateConnectionStatus('Offline');
+                    addLog('API connection failed', 'error');
+                });
+        }
+
+        function updateConnectionStatus(status) {
+            var statusElement = document.getElementById('connectionStatus');
+            if (status === 'Online') {
+                statusElement.textContent = 'Online';
+                statusElement.className = 'connection-status connection-online';
+            } else {
+                statusElement.textContent = 'Offline';
+                statusElement.className = 'connection-status connection-offline';
+            }
+        }
+
+        function startRealTimeUpdates() {
+            setInterval(function() {
+                if (currentTicker && isConnected) {
+                    updateMarketData(currentTicker);
+                }
+            }, 5000);
+
+            setInterval(function() {
+                if (activeTrades.length > 0) {
+                    updatePnLDisplay();
+                }
+            }, 10000);
+
+            setInterval(function() {
+                if (isAutoTrading && currentTicker && customStrategy) {
+                    checkTradingSignals();
+                }
+            }, 30000);
+        }
+
+        function updateMarketData(symbol) {
+            if (!isConnected) return;
+
+            fetch(API_BASE_URL + '/api/market-data/' + symbol)
+                .then(function(response) {
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (data.currentPrice) {
+                        updateIndicators(data);
+                        priceData.push({
+                            time: new Date(),
+                            price: data.currentPrice,
+                            volume: data.volume
+                        });
+
+                        if (priceData.length > 100) {
+                            priceData = priceData.slice(-100);
+                        }
+
+                        updateChart();
+                    }
+                })
+                .catch(function(error) {
+                    addLog('Market data error: ' + error.message, 'error');
+                });
+        }
+
+        function updateIndicators(data) {
+            indicators = data;
+
+            document.getElementById('currentPrice').textContent = '$' + data.currentPrice.toFixed(2);
+            document.getElementById('rsi').textContent = (data.rsi || 0).toFixed(2);
+            document.getElementById('volume').textContent = (data.volume || 0).toLocaleString();
+
+            if (data.macd) {
+                document.getElementById('macd').textContent = data.macd.macd.toFixed(4);
+            }
+
+            var signal = data.signal || 'HOLD';
+            var signalDisplay = document.getElementById('signalDisplay');
+            var signalText = document.getElementById('signalText');
+
+            signalText.textContent = signal;
+            signalDisplay.className = 'signal-display signal-' + signal.toLowerCase();
+
+            if (customStrategy) {
+                try {
+                    var customResult = evaluateCustomStrategy(data);
+                    document.getElementById('customIndicatorValue').textContent = customResult;
+                } catch (error) {
+                    document.getElementById('customIndicatorValue').textContent = 'Error';
+                    addLog('Custom indicator error', 'error');
+                }
+            }
+        }
+
+        function updateChart() {
+            if (priceData.length === 0) return;
+
+            var canvas = document.getElementById('priceChart');
+            var ctx = canvas.getContext('2d');
+
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (priceData.length < 2) return;
+
+            var prices = priceData.map(function(d) { return d.price; });
+            var minPrice = Math.min.apply(Math, prices);
+            var maxPrice = Math.max.apply(Math, prices);
+            var priceRange = maxPrice - minPrice || 1;
+
+            ctx.strokeStyle = '#4facfe';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            for (var i = 0; i < priceData.length; i++) {
+                var x = (i / (priceData.length - 1)) * canvas.width;
+                var y = canvas.height - ((priceData[i].price - minPrice) / priceRange) * canvas.height;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+
+            ctx.stroke();
+        }
+
+        function executeTrade(action) {
             if (!currentTicker) {
                 alert('Please select a ticker first');
                 return;
             }
-            alert('Cancel orders functionality - simulation mode');
-        }
 
-        async function setStopLoss() {
-            const stopPrice = prompt('Enter stop loss price:');
-            if (stopPrice) alert(`Stop loss set at $${stopPrice} - simulation mode`);
-        }
+            if (!isConnected) {
+                alert('API connection lost');
+                return;
+            }
 
-        async function updateMarketData(symbol) {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/market-data/${symbol}`);
-                const data = await response.json();
-                if (response.ok) {
-                    document.getElementById('currentPrice').textContent = '$' + data.currentPrice.toFixed(2);
-                    document.getElementById('rsi').textContent = (data.rsi || 0).toFixed(2);
-                    document.getElementById('volume').textContent = (data.volume || 0).toLocaleString();
-                    document.getElementById('signalText').textContent = data.signal || 'HOLD';
+            var quantity = parseInt(document.getElementById('quantity').value);
+            var currentPrice = indicators.currentPrice || 100;
+
+            var orderData = {
+                symbol: currentTicker,
+                action: action.toUpperCase(),
+                quantity: quantity,
+                orderType: 'MARKET',
+                timeInForce: 'DAY',
+                price: currentPrice
+            };
+
+            fetch(API_BASE_URL + '/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(orderData)
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(result) {
+                if (result.success) {
+                    addLog(action.toUpperCase() + ' order executed: ' + quantity + ' shares at $' + currentPrice.toFixed(2), 'success');
+
+                    var trade = {
+                        id: Date.now(),
+                        symbol: currentTicker,
+                        action: action.toUpperCase(),
+                        quantity: quantity,
+                        entryPrice: currentPrice,
+                        timestamp: new Date(),
+                        status: 'OPEN'
+                    };
+
+                    if (action.toUpperCase() === 'BUY') {
+                        activeTrades.push(trade);
+                    } else {
+                        var existingTrade = null;
+                        for (var i = 0; i < activeTrades.length; i++) {
+                            if (activeTrades[i].symbol === currentTicker && activeTrades[i].status === 'OPEN') {
+                                existingTrade = activeTrades[i];
+                                break;
+                            }
+                        }
+
+                        if (existingTrade) {
+                            existingTrade.status = 'CLOSED';
+                            existingTrade.exitPrice = currentPrice;
+                            var profit = (currentPrice - existingTrade.entryPrice) * existingTrade.quantity;
+                            realizedPnL += profit;
+                            addLog('Position closed: ' + (profit > 0 ? '+' : '') + '$' + profit.toFixed(2), profit > 0 ? 'success' : 'error');
+                        }
+                    }
+
+                    updateActiveTradesDisplay();
+                    updatePnLDisplay();
+                    alert(action.toUpperCase() + ' order submitted successfully!');
+                } else {
+                    throw new Error(result.error);
                 }
-            } catch (error) {
-                console.error('Market data error:', error);
+            })
+            .catch(function(error) {
+                addLog('Trade failed: ' + error.message, 'error');
+                alert('Trade failed: ' + error.message);
+            });
+        }
+
+        function cancelAllOrders() {
+            addLog('All orders cancelled', 'warning');
+            alert('All orders cancelled');
+        }
+
+        function setStopLoss() {
+            var stopLossPercent = document.getElementById('stopLossPercent').value;
+            if (!currentTicker || !indicators.currentPrice) {
+                alert('Please select a ticker first');
+                return;
+            }
+
+            var currentPrice = indicators.currentPrice;
+            var stopPrice = currentPrice * (1 - stopLossPercent / 100);
+
+            addLog('Stop loss set at $' + stopPrice.toFixed(2), 'warning');
+            alert('Stop loss set at $' + stopPrice.toFixed(2));
+        }
+
+        function setProfitTarget() {
+            var profitTargetPercent = document.getElementById('profitTargetPercent').value;
+            if (!currentTicker || !indicators.currentPrice) {
+                alert('Please select a ticker first');
+                return;
+            }
+
+            var currentPrice = indicators.currentPrice;
+            var targetPrice = currentPrice * (1 + profitTargetPercent / 100);
+
+            addLog('Profit target set at $' + targetPrice.toFixed(2), 'success');
+            alert('Profit target set at $' + targetPrice.toFixed(2));
+        }
+
+        function toggleAutomation() {
+            if (!currentTicker) {
+                alert('Please select a ticker first');
+                return;
+            }
+
+            if (!customStrategy) {
+                alert('Please load a strategy first');
+                return;
+            }
+
+            isAutoTrading = !isAutoTrading;
+            var toggleBtn = document.getElementById('toggleAuto');
+            var statusIndicator = document.getElementById('autoStatus');
+            var statusText = document.getElementById('autoStatusText');
+
+            if (isAutoTrading) {
+                toggleBtn.textContent = 'Stop Auto Trading';
+                toggleBtn.className = 'btn btn-danger';
+                statusIndicator.className = 'status-indicator status-active';
+                statusText.textContent = 'Active';
+                addLog('Auto trading started', 'success');
+
+                autoTradingInterval = setInterval(function() {
+                    checkTradingSignals();
+                }, 30000);
+
+            } else {
+                toggleBtn.textContent = 'Start Auto Trading';
+                toggleBtn.className = 'btn btn-primary';
+                statusIndicator.className = 'status-indicator status-inactive';
+                statusText.textContent = 'Inactive';
+                addLog('Auto trading stopped', 'warning');
+
+                if (autoTradingInterval) {
+                    clearInterval(autoTradingInterval);
+                    autoTradingInterval = null;
+                }
             }
         }
-    </script>
-</body>
-</html>
+
+        function loadStrategy() {
+            var strategyCode = document.getElementById('customScript').value.trim();
+            if (!strategyCode) {
+                alert('Please enter a strategy first');
+                return;
+            }
+
+            customStrategy = strategyCode;
+            addLog('Strategy loaded', 'success');
+            alert('Strategy loaded successfully!');
+        }
+
+        function testStrategy() {
+            if (!customStrategy) {
+                alert('Please load a strategy first');
+                return;
+            }
+
+            if (!indicators.currentPrice) {
+                alert('Please select a ticker first');
+                return;
+            }
+
+            try {
+                var result = evaluateCustomStrategy(indicators);
+                addLog('Strategy test result: ' + result, 'info');
+                alert('Strategy test result: ' + result);
+            } catch (error) {
+                addLog('Strategy test failed', 'error');
+                alert('Strategy test failed');
+            }
+        }
+
+        function clearStrategy() {
+            customStrategy = '';
+            document.getElementById('customScript').value = '';
+            addLog('Strategy cleared', 'info');
+        }
+
+        function evaluateCustomStrategy(data) {
+            if (!customStrategy) return 'N/A';
+
+            try {
+                var rsi = data.rsi || 50;
+                var macd = data.macd ? data.macd.macd : 0;
+                var price = data.currentPrice || 100;
+
+                if (customStrategy.indexOf('rsi < 30') !== -1 && rsi < 30) {
+                    return 'BUY';
+                }
+                if (customStrategy.indexOf('rsi > 70') !== -1 && rsi > 70) {
+                    return 'SELL';
+                }
+
+                return 'HOLD';
+            } catch (error) {
+                throw new Error('Strategy evaluation failed');
+            }
+        }
+
+        function checkTradingSignals() {
+            if (!isAutoTrading || !currentTicker || !customStrategy) return;
+
+            try {
+                var signal = evaluateCustomStrategy(indicators);
+
+                if (signal === 'BUY' || signal === 'SELL') {
+                    addLog('Auto signal: ' + signal, 'info');
+
+                    var hasPosition = false;
+                    for (var i = 0; i < activeTrades.length; i++) {
+                        if (activeTrades[i].symbol === currentTicker && activeTrades[i].status === 'OPEN') {
+                            hasPosition = true;
+                            break;
+                        }
+                    }
