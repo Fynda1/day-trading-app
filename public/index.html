@@ -152,11 +152,12 @@
             <div class="auth-title">Connect to Schwab thinkorswim</div>
             
             <div class="auth-step">
-                <h3>Step 1: Configure Your API Credentials</h3>
-                <p>Your credentials are pre-configured in schwab-config.js</p>
+                <h3>Step 1: API Credentials Configured</h3>
+                <p>Your credentials are embedded and ready to use:</p>
                 <ul style="text-align: left; margin: 10px 0;">
                     <li>App Key: 7GkeldTUPQ1zPrOHQRzR8BA3bNfnRGGI</li>
                     <li>Callback URL: https://day-trading-app-production.up.railway.app/oauth/callback</li>
+                    <li>Status: Ready for connection</li>
                 </ul>
             </div>
 
@@ -284,8 +285,257 @@
         </div>
     </div>
 
-    <!-- Include Schwab API Configuration -->
-    <script src="schwab-config.js"></script>
+    <!-- Schwab API Configuration (Embedded) -->
+    <script>
+        // Schwab API Configuration
+        class SchwabAPI {
+            constructor() {
+                // YOUR ACTUAL SCHWAB CREDENTIALS
+                this.clientId = '7GkeldTUPQ1zPrOHQRzR8BA3bNfnRGGI';
+                this.clientSecret = '8bEOqZrayswy1DNG';
+                this.redirectUri = 'https://day-trading-app-production.up.railway.app/oauth/callback';
+                
+                // Schwab API URLs
+                this.baseUrl = 'https://api.schwabapi.com';
+                this.authUrl = 'https://api.schwabapi.com/oauth/authorize';
+                this.tokenUrl = 'https://api.schwabapi.com/oauth/token';
+                
+                // Token storage
+                this.accessToken = localStorage.getItem('schwab_access_token');
+                this.refreshToken = localStorage.getItem('schwab_refresh_token');
+                this.tokenExpiry = localStorage.getItem('schwab_token_expiry');
+                
+                this.accountNumber = null;
+                
+                console.log('✅ Schwab API initialized with credentials');
+            }
+
+            // Get authorization URL
+            getAuthorizationUrl() {
+                const params = new URLSearchParams({
+                    client_id: this.clientId,
+                    redirect_uri: this.redirectUri,
+                    response_type: 'code',
+                    scope: 'readonly'
+                });
+                
+                const url = `${this.authUrl}?${params.toString()}`;
+                console.log('🔗 Authorization URL generated:', url);
+                return url;
+            }
+
+            // Exchange authorization code for tokens
+            async getTokens(authorizationCode) {
+                try {
+                    console.log('🔄 Exchanging authorization code for tokens...');
+                    
+                    const response = await fetch(this.tokenUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'Authorization': `Basic ${btoa(this.clientId + ':' + this.clientSecret)}`
+                        },
+                        body: new URLSearchParams({
+                            grant_type: 'authorization_code',
+                            code: authorizationCode,
+                            redirect_uri: this.redirectUri
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('❌ Token request failed:', response.status, errorText);
+                        throw new Error(`Token request failed: ${response.status} - ${errorText}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    this.accessToken = data.access_token;
+                    this.refreshToken = data.refresh_token;
+                    this.tokenExpiry = Date.now() + (data.expires_in * 1000);
+                    
+                    localStorage.setItem('schwab_access_token', this.accessToken);
+                    localStorage.setItem('schwab_refresh_token', this.refreshToken);
+                    localStorage.setItem('schwab_token_expiry', this.tokenExpiry);
+                    
+                    console.log('✅ Successfully obtained Schwab tokens');
+                    return true;
+                } catch (error) {
+                    console.error('❌ Failed to get tokens:', error);
+                    return false;
+                }
+            }
+
+            // Refresh access token when needed
+            async refreshAccessToken() {
+                if (!this.refreshToken) {
+                    throw new Error('No refresh token available');
+                }
+
+                try {
+                    console.log('🔄 Refreshing access token...');
+                    
+                    const response = await fetch(this.tokenUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'Authorization': `Basic ${btoa(this.clientId + ':' + this.clientSecret)}`
+                        },
+                        body: new URLSearchParams({
+                            grant_type: 'refresh_token',
+                            refresh_token: this.refreshToken
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Token refresh failed: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    this.accessToken = data.access_token;
+                    this.tokenExpiry = Date.now() + (data.expires_in * 1000);
+                    
+                    localStorage.setItem('schwab_access_token', this.accessToken);
+                    localStorage.setItem('schwab_token_expiry', this.tokenExpiry);
+                    
+                    console.log('✅ Token refreshed successfully');
+                    return true;
+                } catch (error) {
+                    console.error('❌ Failed to refresh token:', error);
+                    return false;
+                }
+            }
+
+            // Check if we need to refresh token
+            async ensureValidToken() {
+                if (!this.accessToken) {
+                    throw new Error('No access token. Please authenticate first.');
+                }
+
+                if (Date.now() >= this.tokenExpiry - 300000) {
+                    await this.refreshAccessToken();
+                }
+            }
+
+            // Make authenticated API request
+            async makeRequest(endpoint, options = {}) {
+                await this.ensureValidToken();
+                
+                const url = `${this.baseUrl}${endpoint}`;
+                const requestOptions = {
+                    ...options,
+                    headers: {
+                        'Authorization': `Bearer ${this.accessToken}`,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                };
+
+                console.log(`📡 Making API request to: ${url}`);
+                const response = await fetch(url, requestOptions);
+                
+                if (!response.ok) {
+                    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+                }
+                
+                return response.json();
+            }
+
+            // Get account information
+            async getAccounts() {
+                try {
+                    const data = await this.makeRequest('/trader/v1/accounts');
+                    if (data && data.length > 0) {
+                        this.accountNumber = data[0].accountNumber;
+                        console.log('✅ Account found:', this.accountNumber);
+                    }
+                    return data;
+                } catch (error) {
+                    console.error('❌ Failed to get accounts:', error);
+                    throw error;
+                }
+            }
+
+            // Get account positions
+            async getPositions() {
+                if (!this.accountNumber) {
+                    await this.getAccounts();
+                }
+                
+                return this.makeRequest(`/trader/v1/accounts/${this.accountNumber}/positions`);
+            }
+
+            // Get account balance
+            async getBalance() {
+                if (!this.accountNumber) {
+                    await this.getAccounts();
+                }
+                
+                return this.makeRequest(`/trader/v1/accounts/${this.accountNumber}`);
+            }
+
+            // Get stock quote
+            async getQuote(symbol) {
+                return this.makeRequest(`/marketdata/v1/quotes?symbols=${symbol}`);
+            }
+
+            // Place order
+            async placeOrder(orderData) {
+                if (!this.accountNumber) {
+                    await this.getAccounts();
+                }
+                
+                return this.makeRequest(`/trader/v1/accounts/${this.accountNumber}/orders`, {
+                    method: 'POST',
+                    body: JSON.stringify(orderData)
+                });
+            }
+
+            // Get orders
+            async getOrders() {
+                if (!this.accountNumber) {
+                    await this.getAccounts();
+                }
+                
+                return this.makeRequest(`/trader/v1/accounts/${this.accountNumber}/orders`);
+            }
+
+            // Cancel order
+            async cancelOrder(orderId) {
+                if (!this.accountNumber) {
+                    await this.getAccounts();
+                }
+                
+                return this.makeRequest(`/trader/v1/accounts/${this.accountNumber}/orders/${orderId}`, {
+                    method: 'DELETE'
+                });
+            }
+
+            // Check if authenticated
+            isAuthenticated() {
+                return !!this.accessToken && Date.now() < this.tokenExpiry;
+            }
+
+            // Clear stored tokens (logout)
+            logout() {
+                this.accessToken = null;
+                this.refreshToken = null;
+                this.tokenExpiry = null;
+                this.accountNumber = null;
+                
+                localStorage.removeItem('schwab_access_token');
+                localStorage.removeItem('schwab_refresh_token');
+                localStorage.removeItem('schwab_token_expiry');
+                
+                console.log('✅ Logged out successfully');
+            }
+        }
+
+        // Create global instance
+        window.schwabAPI = new SchwabAPI();
+        console.log('✅ Schwab API loaded and ready');
+    </script>
 
     <script>
         let isDemoMode = false;
@@ -293,19 +543,19 @@
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Fynda Auto Trading BOT initializing...');
+            console.log('🚀 Fynda Auto Trading BOT initializing...');
             checkAuthStatus();
         });
 
         // Check if user is already authenticated
         function checkAuthStatus() {
             if (window.schwabAPI && window.schwabAPI.isAuthenticated()) {
-                console.log('User already authenticated');
+                console.log('✅ User already authenticated');
                 showMainInterface();
                 loadAccountData();
                 updateConnectionStatus('Connected to Schwab', true);
             } else {
-                console.log('User not authenticated');
+                console.log('❌ User not authenticated');
                 showAuthPanel();
                 updateConnectionStatus('Not Connected', false);
             }
@@ -338,15 +588,20 @@
         // Start Schwab authentication process
         function startSchwabAuth() {
             if (!window.schwabAPI) {
-                alert('Schwab API not loaded. Please ensure schwab-config.js is included and configured.');
+                alert('❌ Schwab API not loaded. Please refresh the page and try again.');
                 return;
             }
 
-            const authUrl = window.schwabAPI.getAuthorizationUrl();
-            console.log('Opening authorization URL:', authUrl);
-            window.open(authUrl, '_blank', 'width=600,height=700');
-            
-            alert('1. A new window opened with Schwab login\n2. Log in and authorize the app\n3. Copy the authorization code from the redirect URL\n4. Come back here and paste it in the text field');
+            try {
+                const authUrl = window.schwabAPI.getAuthorizationUrl();
+                console.log('🔗 Opening authorization URL:', authUrl);
+                window.open(authUrl, '_blank', 'width=600,height=700');
+                
+                alert('✅ Authorization window opened!\n\n1. Log in to your Schwab account\n2. Authorize the app\n3. Copy the authorization code from the callback page\n4. Return here and paste it below');
+            } catch (error) {
+                console.error('❌ Failed to start auth:', error);
+                alert('❌ Failed to start authorization. Please check the console for details.');
+            }
         }
 
         // Complete authentication with authorization code
@@ -359,21 +614,21 @@
 
             try {
                 updateConnectionStatus('Connecting...', false);
-                console.log('Attempting to authenticate with code:', authCode);
+                console.log('🔄 Attempting to authenticate with code...');
                 
                 const success = await window.schwabAPI.getTokens(authCode);
                 if (success) {
-                    console.log('Authentication successful');
+                    console.log('✅ Authentication successful');
                     showMainInterface();
                     loadAccountData();
                     updateConnectionStatus('Connected to Schwab', true);
-                    alert('Successfully connected to Schwab!');
+                    alert('✅ Successfully connected to Schwab!\n\nYou can now place trades and view your account data.');
                 } else {
                     throw new Error('Failed to get tokens');
                 }
             } catch (error) {
-                console.error('Authentication failed:', error);
-                alert('Authentication failed. Please check your credentials and try again.');
+                console.error('❌ Authentication failed:', error);
+                alert(`❌ Authentication failed: ${error.message}\n\nPlease check your authorization code and try again.`);
                 updateConnectionStatus('Connection Failed', false);
             }
         }
@@ -381,7 +636,7 @@
         // Enable demo mode
         function enableDemoMode() {
             isDemoMode = true;
-            console.log('Demo mode enabled');
+            console.log('🎮 Demo mode enabled');
             showMainInterface();
             updateConnectionStatus('Demo Mode', false);
             document.getElementById('connectionStatus').className = 'connection-status connection-demo';
@@ -391,9 +646,11 @@
             document.getElementById('buyingPower').textContent = '$25,000.00';
             document.getElementById('accountNumber').textContent = 'DEMO123456';
             document.getElementById('accountStatusText').textContent = 'Demo Account';
-            document.getElementById('positionsList').innerHTML = 'No positions (Demo Mode)';
-            document.getElementById('ordersList').innerHTML = 'No orders (Demo Mode)';
+            document.getElementById('positionsList').innerHTML = '<div class="data-item">No positions (Demo Mode)</div>';
+            document.getElementById('ordersList').innerHTML = '<div class="data-item">No orders (Demo Mode)</div>';
             document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            
+            alert('🎮 Demo Mode Activated!\n\nYou can test all features safely without real money.');
         }
 
         // Load account data from Schwab
@@ -401,7 +658,7 @@
             if (isDemoMode) return;
 
             try {
-                console.log('Loading account data...');
+                console.log('📊 Loading account data...');
                 
                 // Get account info
                 const accounts = await window.schwabAPI.getAccounts();
@@ -409,7 +666,7 @@
                     const account = accounts[0];
                     document.getElementById('accountNumber').textContent = account.accountNumber;
                     document.getElementById('accountStatusText').textContent = account.type || 'Active';
-                    console.log('Account loaded:', account.accountNumber);
+                    console.log('✅ Account loaded:', account.accountNumber);
                 }
 
                 // Get balance
@@ -417,7 +674,7 @@
                 if (balance) {
                     document.getElementById('accountBalance').textContent = `$${balance.currentBalances?.liquidationValue?.toLocaleString() || '0.00'}`;
                     document.getElementById('buyingPower').textContent = `$${balance.currentBalances?.buyingPower?.toLocaleString() || '0.00'}`;
-                    console.log('Balance loaded');
+                    console.log('✅ Balance loaded');
                 }
 
                 // Get positions
@@ -429,15 +686,15 @@
                 document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
 
             } catch (error) {
-                console.error('Failed to load account data:', error);
-                alert('Failed to load account data. Please check your connection.');
+                console.error('❌ Failed to load account data:', error);
+                alert('⚠️ Failed to load account data. Please check your connection and try refreshing.');
             }
         }
 
         // Load positions
         async function loadPositions() {
             if (isDemoMode) {
-                document.getElementById('positionsList').innerHTML = 'No positions (Demo Mode)';
+                document.getElementById('positionsList').innerHTML = '<div class="data-item">No positions (Demo Mode)</div>';
                 return;
             }
 
@@ -448,7 +705,7 @@
                         <div class="data-item">
                             <strong>${pos.instrument?.symbol || 'N/A'}</strong> - 
                             ${pos.longQuantity || 0} shares @ 
-                            $${pos.averagePrice?.toFixed(2) || '0.00'}
+                            ${pos.averagePrice?.toFixed(2) || '0.00'}
                         </div>
                     `).join('')
                     : '<div class="data-item">No current positions</div>';
@@ -494,7 +751,7 @@
             
             if (isDemoMode) {
                 const demoPrice = Math.random() * 100 + 50;
-                document.getElementById('currentPrice').textContent = `$${demoPrice.toFixed(2)}`;
+                document.getElementById('currentPrice').textContent = `${demoPrice.toFixed(2)}`;
                 return demoPrice;
             }
 
@@ -502,11 +759,11 @@
                 const quote = await window.schwabAPI.getQuote(currentTicker);
                 if (quote && quote[currentTicker]) {
                     const price = quote[currentTicker].lastPrice || 0;
-                    document.getElementById('currentPrice').textContent = `$${price.toFixed(2)}`;
+                    document.getElementById('currentPrice').textContent = `${price.toFixed(2)}`;
                     
                     const change = quote[currentTicker].netChange || 0;
                     const changeElement = document.getElementById('dailyChange');
-                    changeElement.textContent = `${change >= 0 ? '+' : ''}$${change.toFixed(2)}`;
+                    changeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}`;
                     changeElement.style.color = change >= 0 ? '#22c55e' : '#ef4444';
                     
                     document.getElementById('volume').textContent = (quote[currentTicker].totalVolume || 0).toLocaleString();
@@ -533,7 +790,7 @@
             }
 
             if (isDemoMode) {
-                alert(`DEMO: ${action.toUpperCase()} ${quantity} shares of ${currentTicker}`);
+                alert(`🎮 DEMO: ${action.toUpperCase()} ${quantity} shares of ${currentTicker}\n\nThis is a simulated trade - no real money involved!`);
                 return;
             }
 
@@ -557,11 +814,11 @@
                     }]
                 };
 
-                console.log('Placing order:', orderData);
+                console.log('📝 Placing order:', orderData);
                 const result = await window.schwabAPI.placeOrder(orderData);
                 
                 if (result) {
-                    alert(`${action.toUpperCase()} order placed successfully!`);
+                    alert(`✅ ${action.toUpperCase()} order placed successfully!\n\n${quantity} shares of ${currentTicker}`);
                     await loadOrders(); // Refresh orders
                     await loadAccountData(); // Refresh account data
                 } else {
@@ -569,8 +826,8 @@
                 }
 
             } catch (error) {
-                console.error('Trade failed:', error);
-                alert(`Trade failed: ${error.message}`);
+                console.error('❌ Trade failed:', error);
+                alert(`❌ Trade failed: ${error.message}\n\nPlease check your account and try again.`);
             } finally {
                 // Re-enable buttons
                 document.getElementById('buyBtn').disabled = false;
@@ -581,49 +838,53 @@
         // Test connection
         async function testConnection() {
             if (isDemoMode) {
-                alert('Demo Mode - Connection test skipped');
+                alert('🎮 Demo Mode - Connection test skipped\n\nSwitch to live mode to test real connection.');
                 return;
             }
 
             try {
                 updateConnectionStatus('Testing...', false);
+                console.log('🔍 Testing connection...');
+                
                 const accounts = await window.schwabAPI.getAccounts();
                 if (accounts && accounts.length > 0) {
                     updateConnectionStatus('Connected to Schwab', true);
-                    alert('Connection test successful!');
+                    alert('✅ Connection test successful!\n\nYour Schwab account is connected and ready.');
                 } else {
                     throw new Error('No accounts found');
                 }
             } catch (error) {
-                console.error('Connection test failed:', error);
+                console.error('❌ Connection test failed:', error);
                 updateConnectionStatus('Connection Failed', false);
-                alert(`Connection test failed: ${error.message}`);
+                alert(`❌ Connection test failed: ${error.message}\n\nPlease check your credentials and try reconnecting.`);
             }
         }
 
         // Refresh all data
         async function refreshData() {
             if (isDemoMode) {
-                alert('Demo Mode - Data refreshed');
+                alert('🎮 Demo Mode - Data refreshed\n\nDemo data has been updated.');
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
                 return;
             }
 
             try {
+                console.log('🔄 Refreshing all data...');
                 await loadAccountData();
                 if (currentTicker) {
                     await getCurrentPrice();
                 }
-                alert('Data refreshed successfully!');
+                alert('✅ Data refreshed successfully!');
             } catch (error) {
-                console.error('Refresh failed:', error);
-                alert(`Refresh failed: ${error.message}`);
+                console.error('❌ Refresh failed:', error);
+                alert(`❌ Refresh failed: ${error.message}`);
             }
         }
 
         // Get account info
         async function getAccountInfo() {
             if (isDemoMode) {
-                alert('Demo Account Info:\nAccount: DEMO123456\nType: Demo\nStatus: Active');
+                alert('🎮 Demo Account Info:\n\nAccount: DEMO123456\nType: Demo Account\nStatus: Active\nBalance: $25,000.00\nBuying Power: $25,000.00');
                 return;
             }
 
@@ -631,27 +892,27 @@
                 const accounts = await window.schwabAPI.getAccounts();
                 const balance = await window.schwabAPI.getBalance();
                 
-                let info = 'Account Information:\n\n';
+                let info = '📊 Account Information:\n\n';
                 if (accounts && accounts.length > 0) {
                     info += `Account Number: ${accounts[0].accountNumber}\n`;
                     info += `Account Type: ${accounts[0].type || 'N/A'}\n`;
                 }
                 if (balance) {
-                    info += `Total Value: $${balance.currentBalances?.liquidationValue?.toLocaleString() || '0.00'}\n`;
-                    info += `Buying Power: $${balance.currentBalances?.buyingPower?.toLocaleString() || '0.00'}\n`;
-                    info += `Cash: $${balance.currentBalances?.cashBalance?.toLocaleString() || '0.00'}`;
+                    info += `Total Value: ${balance.currentBalances?.liquidationValue?.toLocaleString() || '0.00'}\n`;
+                    info += `Buying Power: ${balance.currentBalances?.buyingPower?.toLocaleString() || '0.00'}\n`;
+                    info += `Cash: ${balance.currentBalances?.cashBalance?.toLocaleString() || '0.00'}`;
                 }
                 
                 alert(info);
             } catch (error) {
-                console.error('Failed to get account info:', error);
-                alert(`Failed to get account info: ${error.message}`);
+                console.error('❌ Failed to get account info:', error);
+                alert(`❌ Failed to get account info: ${error.message}`);
             }
         }
 
         // Show advanced features (placeholder)
         function showAdvancedFeatures() {
-            alert('Advanced Features:\n\n- Stop Loss Orders\n- Profit Targets\n- Auto Trading\n- Technical Indicators\n- Portfolio Analytics\n\nComing soon!');
+            alert('🚀 Advanced Features:\n\n• Stop Loss Orders\n• Profit Target Orders\n• Auto Trading Strategies\n• Technical Indicators\n• Portfolio Analytics\n• Risk Management\n• Options Trading\n\n📝 Coming soon in future updates!');
         }
 
         // Logout
@@ -665,14 +926,14 @@
             
             // Clear form
             document.getElementById('authCode').value = '';
-            alert('Disconnected successfully');
+            alert('✅ Disconnected successfully\n\nYou can reconnect anytime or use demo mode.');
         }
 
         // Update ticker selection
         document.getElementById('ticker').addEventListener('change', function() {
             if (this.value) {
                 currentTicker = this.value;
-                console.log('Selected ticker:', currentTicker);
+                console.log('📈 Selected ticker:', currentTicker);
                 getCurrentPrice();
             }
         });
@@ -684,7 +945,7 @@
             }
         }, 30000);
 
-        console.log('Fynda Auto Trading BOT loaded successfully');
+        console.log('✅ Fynda Auto Trading BOT loaded successfully');
     </script>
 </body>
 </html>
