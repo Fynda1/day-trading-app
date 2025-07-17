@@ -1,1 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schwab Authorization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #0f1419 0%, #1a202c 50%, #2d3748 100%);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+        }
+        .title {
+            font-size: 2em;
+            color: #4facfe;
+            margin-bottom: 20px;
+        }
+        .code-display {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 16px;
+            word-break: break-all;
+            border: 2px solid #4facfe;
+        }
+        .instructions {
+            background: rgba(79, 172, 254, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .copy-btn {
+            background: #4facfe;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .copy-btn:hover {
+            background: #3b82f6;
+            transform: translateY(-2px);
+        }
+        .success {
+            color: #22c55e;
+            font-weight: bold;
+        }
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">Schwab Authorization</div>
+        
+        <div id="content">
+            <div class="instructions">
+                <h3>Processing authorization...</h3>
+                <p>Please wait while we extract your authorization code.</p>
+            </div>
+        </div>
+    </div>
 
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const error = urlParams.get('error');
+            const contentDiv = document.getElementById('content');
+
+            if (error) {
+                contentDiv.innerHTML = `
+                    <div class="instructions">
+                        <h3 class="error">Authorization Failed</h3>
+                        <p>Error: ${error}</p>
+                        <p>Please close this window and try again.</p>
+                    </div>
+                `;
+            } else if (code) {
+                contentDiv.innerHTML = `
+                    <div class="instructions">
+                        <h3 class="success">Authorization Successful!</h3>
+                        <p>Your authorization code has been generated. Copy the code below and paste it into your trading app:</p>
+                    </div>
+                    
+                    <div class="code-display" id="authCode">${code}</div>
+                    
+                    <button class="copy-btn" onclick="copyToClipboard()">Copy Code</button>
+                    
+                    <div class="instructions">
+                        <h4>Next Steps:</h4>
+                        <ol>
+                            <li>Copy the authorization code above</li>
+                            <li>Go back to your trading app</li>
+                            <li>Paste the code in the "Authorization Code" field</li>
+                            <li>Click "Complete Connection"</li>
+                            <li>Close this window</li>
+                        </ol>
+                    </div>
+                `;
+            } else {
+                contentDiv.innerHTML = `
+                    <div class="instructions">
+                        <h3 class="error">No Authorization Code Found</h3>
+                        <p>The authorization process may have failed. Please close this window and try again.</p>
+                    </div>
+                `;
+            }
+        });
+
+        function copyToClipboard() {
+            const codeElement = document.getElementById('authCode');
+            const code = codeElement.textContent;
+            
+            navigator.clipboard.writeText(code).then(function() {
+                const button = document.querySelector('.copy-btn');
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.style.background = '#22c55e';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '#4facfe';
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Failed to copy: ', err);
+                // Fallback: select the text
+                const range = document.createRange();
+                range.selectNode(codeElement);
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+                alert('Code selected. Press Ctrl+C (or Cmd+C on Mac) to copy.');
+            });
+        }
+    </script>
+</body>
+</html>
