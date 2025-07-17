@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Day Trading Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; background: #f4f4f4; }
+    h1 { color: #333; }
+    #output { margin-top: 1rem; padding: 1rem; background: white; border-radius: 5px; }
+    button { padding: 0.5rem 1rem; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>📈 Day Trading App</h1>
+  <input type="text" id="symbolInput" placeholder="Enter stock symbol (e.g. AAPL)" />
+  <button onclick="fetchMarketData()">Get Market Data</button>
+
+  <div id="output"></div>
+
+  <script>
+    async function fetchMarketData() {
+      const symbol = document.getElementById('symbolInput').value.trim();
+      const output = document.getElementById('output');
+      if (!symbol) {
+        output.innerHTML = '<p style="color:red;">Please enter a symbol.</p>';
+        return;
+      }
+
+      output.innerHTML = '<p>Loading...</p>';
+      try {
+        const res = await fetch('/api/market-data/' + symbol);
+        const data = await res.json();
+        output.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      } catch (err) {
+        output.innerHTML = '<p style="color:red;">Error fetching data.</p>';
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>
