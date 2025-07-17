@@ -1,4 +1,10 @@
-require('dotenv').config();
+// Add error handling for dotenv and dependencies
+try {
+  require('dotenv').config();
+} catch (error) {
+  console.warn('dotenv not found, using environment variables directly');
+}
+
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -36,7 +42,7 @@ async function authenticateWithSchwab() {
       throw new Error('Schwab API credentials not configured');
     }
 
-    const response = await axios.post(\'\${SCHWAB_API_BASE}/trader/v1/oauth/token\',
+    const response = await axios.post(`${SCHWAB_API_BASE}/trader/v1/oauth/token`,
       new URLSearchParams({
         grant_type: 'client_credentials',
         client_id: CLIENT_ID,
@@ -69,17 +75,17 @@ async function getMarketData(symbol) {
       await authenticateWithSchwab();
     }
 
-    const response = await axios.get(\'\${SCHWAB_API_BASE}/marketdata/v1/quotes\', {
+    const response = await axios.get(`${SCHWAB_API_BASE}/marketdata/v1/quotes`, {
       params: { symbol },
       headers: {
-        'Authorization': \'Bearer \${accessToken}\',
+        'Authorization': `Bearer ${accessToken}`,
         'Accept': 'application/json'
       }
     });
 
     const quote = response.data[symbol];
     if (!quote) {
-      throw new Error(\'No data found for symbol: \${symbol}\');
+      throw new Error(`No data found for symbol: ${symbol}`);
     }
 
     return {
@@ -206,7 +212,7 @@ app.delete('/api/orders/cancel/:symbol', async (req, res) => {
     res.json({
       success: true,
       cancelled,
-      message: \'Cancelled \${cancelled} orders for \${symbol} (simulated)\'
+      message: `Cancelled ${cancelled} orders for ${symbol} (simulated)`
     });
   } catch (error) {
     console.error('Cancel orders error:', error);
@@ -244,16 +250,35 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(\'Trading API server running on port \${PORT}\');
-  console.log(\'Environment: \${process.env.NODE_ENV || 'development'}\');
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Trading API server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Server accessible at: http://0.0.0.0:${PORT}`);
+
   if (CLIENT_ID && CLIENT_SECRET) {
     authenticateWithSchwab().catch(err => {
-      console.warn('Schwab API not available, running in simulation mode');
+      console.warn('WARNING: Schwab API not available, running in simulation mode');
+      console.warn('Schwab error:', err.message);
     });
   } else {
-    console.warn('Schwab credentials not configured, running in simulation mode');
+    console.warn('WARNING: Schwab credentials not configured, running in simulation mode');
   }
+}).on('error', (err) => {
+  console.error('ERROR: Server failed to start:', err);
+  process.exit(1);
+});
+
+// Global error handlers
+process.on('uncaughtException', (error) => {
+  console.error('ERROR: Uncaught Exception:', error);
+  console.error('Stack:', error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('ERROR: Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('Stack:', reason?.stack);
+  process.exit(1);
 });
 
 module.exports = app;
