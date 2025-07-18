@@ -2,9 +2,9 @@
 class SchwabAPI {
     constructor() {
         // YOUR ACTUAL SCHWAB CREDENTIALS
-        this.clientId = '7GkeldTUPQ1zPrOHQRzR8BA3bNfnRGGI';
-        this.clientSecret = '8bEOqZrayswy1DNG';
-        this.redirectUri = 'https://day-trading-app-production.up.railway.app/oauth/callback';
+        this.clientId = '7GkeldTUPQ1zPrOHQRzR8BA3bNfnRGGI';  // Your App Key
+        this.clientSecret = '8bEOqZrayswy1DNG';  // Your App Secret
+        this.redirectUri = 'https://day-trading-app-production.up.railway.app/oauth/callback';  // Your redirect URI
         
         // Schwab API URLs
         this.baseUrl = 'https://api.schwabapi.com';
@@ -25,7 +25,7 @@ class SchwabAPI {
             client_id: this.clientId,
             redirect_uri: this.redirectUri,
             response_type: 'code',
-            scope: 'readonly'
+            scope: 'readonly' // Add more scopes as needed
         });
         
         return `${this.authUrl}?${params.toString()}`;
@@ -53,10 +53,12 @@ class SchwabAPI {
 
             const data = await response.json();
             
+            // Store tokens
             this.accessToken = data.access_token;
             this.refreshToken = data.refresh_token;
             this.tokenExpiry = Date.now() + (data.expires_in * 1000);
             
+            // Save to localStorage
             localStorage.setItem('schwab_access_token', this.accessToken);
             localStorage.setItem('schwab_refresh_token', this.refreshToken);
             localStorage.setItem('schwab_token_expiry', this.tokenExpiry);
@@ -114,7 +116,7 @@ class SchwabAPI {
             throw new Error('No access token. Please authenticate first.');
         }
 
-        if (Date.now() >= this.tokenExpiry - 300000) {
+        if (Date.now() >= this.tokenExpiry - 300000) { // Refresh 5 minutes before expiry
             await this.refreshAccessToken();
         }
     }
