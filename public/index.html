@@ -717,32 +717,58 @@
                 const params = new URLSearchParams({
                     client_id: this.clientId,
                     redirect_uri: this.redirectUri,
-                    response_type: 'code'
+                    response_type: 'code',
+                    scope: 'readonly'
                 });
                 return `${this.authUrl}?${params.toString()}`;
             }
 
             async getTokens(authorizationCode) {
                 try {
+                    // Decode the authorization code if it's URL encoded
+                    const decodedCode = decodeURIComponent(authorizationCode);
+                    
+                    const requestBody = new URLSearchParams({
+                        grant_type: 'authorization_code',
+                        code: decodedCode,
+                        redirect_uri: this.redirectUri,
+                        client_id: this.clientId
+                    });
+
+                    console.log('🔄 Making token request with:', {
+                        url: this.tokenUrl,
+                        clientId: this.clientId,
+                        redirectUri: this.redirectUri,
+                        codeLength: decodedCode.length
+                    });
+
                     const response = await fetch(this.tokenUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded',
-                            'Authorization': `Basic ${btoa(this.clientId + ':' + this.clientSecret)}`
+                            'Authorization': `Basic ${btoa(this.clientId + ':' + this.clientSecret)}`,
+                            'Accept': 'application/json'
                         },
-                        body: new URLSearchParams({
-                            grant_type: 'authorization_code',
-                            code: authorizationCode,
-                            redirect_uri: this.redirectUri
-                        })
+                        body: requestBody.toString()
                     });
 
+                    console.log('📡 Token response status:', response.status);
+                    
+                    const responseText = await response.text();
+                    console.log('📡 Token response:', responseText);
+
                     if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`Token request failed: ${response.status} - ${errorText}`);
+                        let errorMessage = `HTTP ${response.status}`;
+                        try {
+                            const errorData = JSON.parse(responseText);
+                            errorMessage = errorData.error_description || errorData.error || errorMessage;
+                        } catch (e) {
+                            errorMessage = responseText;
+                        }
+                        throw new Error(`Token request failed: ${errorMessage}`);
                     }
 
-                    const data = await response.json();
+                    const data = JSON.parse(responseText);
                     
                     this.accessToken = data.access_token;
                     this.refreshToken = data.refresh_token;
@@ -752,7 +778,7 @@
                     return true;
                 } catch (error) {
                     console.error('❌ Failed to get tokens:', error);
-                    return false;
+                    throw error;
                 }
             }
 
@@ -766,41 +792,95 @@
                     ...options,
                     headers: {
                         'Authorization': `Bearer ${this.accessToken}`,
-                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         ...options.headers
                     }
                 };
 
+                // Only add Content-Type for POST/PUT requests with body
+                if (options.method && ['POST', 'PUT', 'PATCH'].includes(options.method.toUpperCase())) {
+                    requestOptions.headers['Content-Type'] = 'application/json';
+                }
+
+                console.log('🔄 Making API request:', {
+                    url: url,
+                    method: options.method || 'GET',
+                    hasAuth: !!this.accessToken
+                });
+
                 const response = await fetch(url, requestOptions);
+                
+                console.log('📡 API response status:', response.status);
                 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    throw new Error(`API request failed: ${response.status} - ${errorText}`);
+                    console.error('❌ API Error Response:', errorText);
+                    
+                    let errorMessage = `HTTP ${response.status}`;
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.message || errorData.error || errorMessage;
+                        
+                        // Handle specific Schwab API errors
+                        if (errorData.errors && Array.isArray(errorData.errors)) {
+                            errorMessage = errorData.errors.map(e => e.message || e.title).join(', ');
+                        }
+                    } catch (e) {
+                        errorMessage = errorText;
+                    }
+                    
+                    throw new Error(`API request failed: ${response.status} - ${errorMessage}`);
                 }
                 
-                return response.json();
+                const responseText = await response.text();
+                return responseText ? JSON.parse(responseText) : {};
             }
 
             async getAccounts() {
-                const data = await this.makeRequest('/trader/v1/accounts');
-                if (data && data.length > 0) {
-                    this.accountNumber = data[0].accountNumber;
+                try {
+                    const data = await this.makeRequest('/trader/v1/accounts');
+                    if (data && Array.isArray(data) && data.length > 0) {
+                        this.accountNumber = data[0].accountNumber;
+                        console.log('✅ Account number retrieved:', this.accountNumber);
+                    }
+                    return data;
+                } catch (error) {
+                    console.error('❌ Failed to get accounts:', error);
+                    throw error;
                 }
-                return data;
             }
 
             async getQuote(symbol) {
-                return this.makeRequest(`/marketdata/v1/quotes?symbols=${symbol}`);
+                try {
+                    return await this.makeRequest(`/marketdata/v1/quotes?symbols=${symbol.toUpperCase()}`);
+                } catch (error) {
+                    console.error('❌ Failed to get quote:', error);
+                    throw error;
+                }
             }
 
             async placeOrder(orderData) {
-                if (!this.accountNumber) {
-                    await this.getAccounts();
+                try {
+                    if (!this.accountNumber) {
+                        console.log('🔄 Getting account number first...');
+                        await this.getAccounts();
+                    }
+                    
+                    if (!this.accountNumber) {
+                        throw new Error('No account number available');
+                    }
+                    
+                    console.log('🔄 Placing order for account:', this.accountNumber);
+                    console.log('📋 Order data:', JSON.stringify(orderData, null, 2));
+                    
+                    return await this.makeRequest(`/trader/v1/accounts/${this.accountNumber}/orders`, {
+                        method: 'POST',
+                        body: JSON.stringify(orderData)
+                    });
+                } catch (error) {
+                    console.error('❌ Failed to place order:', error);
+                    throw error;
                 }
-                return this.makeRequest(`/trader/v1/accounts/${this.accountNumber}/orders`, {
-                    method: 'POST',
-                    body: JSON.stringify(orderData)
-                });
             }
 
             isAuthenticated() {
@@ -927,6 +1007,7 @@
 
             try {
                 console.log('🔄 Attempting to authenticate with code...');
+                addLog('🔄 Authenticating with Schwab API...', 'info');
                 
                 const success = await window.schwabAPI.getTokens(authCode);
                 if (success) {
@@ -936,12 +1017,26 @@
                     addLog('🎉 Successfully connected to Schwab Live Trading!', 'success');
                     alert('✅ Successfully connected to Schwab!\n\nYou are now in LIVE TRADING MODE with real money.');
                 } else {
-                    throw new Error('Failed to get tokens');
+                    throw new Error('Authentication failed - please try again');
                 }
             } catch (error) {
                 console.error('❌ Authentication failed:', error);
                 addLog(`❌ Authentication failed: ${error.message}`, 'error');
-                alert(`❌ Authentication failed: ${error.message}\n\nPlease check your authorization code and try again.`);
+                
+                let errorMessage = error.message;
+                
+                // Handle specific error cases
+                if (error.message.includes('400')) {
+                    errorMessage = 'Invalid authorization code. Please make sure you copied the complete code from the callback URL.';
+                } else if (error.message.includes('500')) {
+                    errorMessage = 'Schwab API server error. Please try again in a few minutes or contact support.';
+                } else if (error.message.includes('401')) {
+                    errorMessage = 'Authentication failed. Please check your credentials and try again.';
+                } else if (error.message.includes('403')) {
+                    errorMessage = 'Access forbidden. Please ensure your app has the correct permissions.';
+                }
+                
+                alert(`❌ Authentication failed: ${errorMessage}\n\nTroubleshooting:\n1. Make sure you copied the ENTIRE authorization code\n2. Try generating a new code\n3. Check that your Schwab account is properly set up\n4. Contact support if the issue persists`);
             }
         }
 
