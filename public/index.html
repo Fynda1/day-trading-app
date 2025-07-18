@@ -537,9 +537,9 @@
 
                 <div class="chart-container">
                     <div class="chart-display" id="chartDisplay">
-                        <div class="chart-canvas" id="chartCanvas" style="display: none;">
+                        <div class="chart-canvas" id="chartCanvas">
                             <div class="chart-header" id="chartHeader">
-                                📊 LIVE CHART - LOADING...
+                                📊 LIVE CHART - SELECT STOCK
                             </div>
                             <div class="chart-content">
                                 <div class="price-bars" id="priceBars">
@@ -548,17 +548,7 @@
                             </div>
                         </div>
                         
-                        <div class="chart-placeholder" id="chartPlaceholder">
-                            <div>📊 Market Analysis Chart</div>
-                            <div style="font-size: 14px; margin-top: 10px; opacity: 0.8;">
-                                Select a stock to view live price chart
-                            </div>
-                            <div style="font-size: 12px; margin-top: 15px; color: #22c55e;">
-                                Charts update in real-time with price movements
-                            </div>
-                        </div>
-                        
-                        <div class="chart-data" id="chartData" style="display: none;">
+                        <div class="chart-data" id="chartData">
                             Price: $0.00 | Volume: 0 | Timeframe: 1M
                         </div>
                     </div>
@@ -715,9 +705,9 @@
                 this.authUrl = 'https://api.schwabapi.com/v1/oauth/authorize';
                 this.tokenUrl = 'https://api.schwabapi.com/v1/oauth/token';
                 
-                this.accessToken = localStorage.getItem('schwab_access_token');
-                this.refreshToken = localStorage.getItem('schwab_refresh_token');
-                this.tokenExpiry = localStorage.getItem('schwab_token_expiry');
+                this.accessToken = null;
+                this.refreshToken = null;
+                this.tokenExpiry = null;
                 this.accountNumber = null;
                 
                 console.log('✅ Schwab API initialized');
@@ -748,7 +738,8 @@
                     });
 
                     if (!response.ok) {
-                        throw new Error(`Token request failed: ${response.status}`);
+                        const errorText = await response.text();
+                        throw new Error(`Token request failed: ${response.status} - ${errorText}`);
                     }
 
                     const data = await response.json();
@@ -756,10 +747,6 @@
                     this.accessToken = data.access_token;
                     this.refreshToken = data.refresh_token;
                     this.tokenExpiry = Date.now() + (data.expires_in * 1000);
-                    
-                    localStorage.setItem('schwab_access_token', this.accessToken);
-                    localStorage.setItem('schwab_refresh_token', this.refreshToken);
-                    localStorage.setItem('schwab_token_expiry', this.tokenExpiry);
                     
                     console.log('✅ Successfully obtained Schwab tokens');
                     return true;
@@ -787,7 +774,8 @@
                 const response = await fetch(url, requestOptions);
                 
                 if (!response.ok) {
-                    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+                    const errorText = await response.text();
+                    throw new Error(`API request failed: ${response.status} - ${errorText}`);
                 }
                 
                 return response.json();
@@ -825,10 +813,6 @@
                 this.tokenExpiry = null;
                 this.accountNumber = null;
                 
-                localStorage.removeItem('schwab_access_token');
-                localStorage.removeItem('schwab_refresh_token');
-                localStorage.removeItem('schwab_token_expiry');
-                
                 console.log('✅ Logged out successfully');
             }
         }
@@ -854,6 +838,7 @@
         let currentSignal = 'HOLD';
         let entryPrice = 0;
         let userWatchlist = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'SPY', 'QQQ', 'PLTR'];
+        let priceHistory = {};
 
         // Demo market data
         const demoStocks = {
@@ -875,18 +860,17 @@
             
             // Update date/time display
             updateDateTime();
-            setInterval(updateDateTime, 1000); // Update every second
+            setInterval(updateDateTime, 1000);
             
-            // Check if already connected to Schwab
-            if (window.schwabAPI && window.schwabAPI.isAuthenticated()) {
-                enableLiveMode();
-            } else {
-                enableDemoMode();
-            }
+            // Start in demo mode
+            enableDemoMode();
             
             loadDemoWatchlist();
             startPriceUpdates();
             updateIndicators();
+            
+            // Initialize chart
+            initializeChart();
         });
 
         // Date/time functions
@@ -956,8 +940,8 @@
                 }
             } catch (error) {
                 console.error('❌ Authentication failed:', error);
-                alert(`❌ Authentication failed: ${error.message}\n\nPlease check your authorization code and try again.`);
                 addLog(`❌ Authentication failed: ${error.message}`, 'error');
+                alert(`❌ Authentication failed: ${error.message}\n\nPlease check your authorization code and try again.`);
             }
         }
 
@@ -1014,30 +998,38 @@
         // Stock selection handlers
         document.getElementById('ticker').addEventListener('change', function() {
             if (this.value) {
-                currentTicker = this.value;
-                entryPrice = getCurrentPrice(); // Set entry price for running P&L
-                document.getElementById('chartSymbol').textContent = currentTicker;
+                selectStock(this.value);
                 document.getElementById('customTicker').value = '';
-                updateCurrentPrice();
-                updateChart();
-                updateRunningPnL();
-                addLog(`📊 Selected stock: ${currentTicker} (Entry: ${entryPrice.toFixed(2)})`, 'info');
             }
         });
 
         document.getElementById('customTicker').addEventListener('input', function() {
             const value = this.value.toUpperCase().trim();
             if (value) {
-                currentTicker = value;
-                entryPrice = getCurrentPrice(); // Set entry price for running P&L
+                selectStock(value);
                 document.getElementById('ticker').value = '';
-                document.getElementById('chartSymbol').textContent = currentTicker;
-                updateCurrentPrice();
-                updateChart();
-                updateRunningPnL();
-                addLog(`🎯 Custom ticker: ${currentTicker} (Entry: ${entryPrice.toFixed(2)})`, 'info');
             }
         });
+
+        // FIXED: Stock selection function
+        function selectStock(symbol) {
+            currentTicker = symbol;
+            entryPrice = getCurrentPrice(symbol);
+            
+            // Update selected stock display
+            document.getElementById('selectedStockDisplay').textContent = symbol;
+            
+            // Update current price
+            updateCurrentPrice();
+            
+            // Update chart
+            updateChart();
+            
+            // Update running P&L
+            updateRunningPnL();
+            
+            addLog(`📊 Selected stock: ${symbol} (Entry: ${entryPrice.toFixed(2)})`, 'info');
+        }
 
         // Trading functions
         async function executeTrade(action) {
@@ -1060,7 +1052,7 @@
             }
 
             if (isLiveMode) {
-                // LIVE TRADING
+                // LIVE TRADING - FIXED: Better error handling
                 const confirmed = confirm(`🚨 LIVE TRADE CONFIRMATION 🚨\n\n${action.toUpperCase()} ${quantity} shares of ${currentTicker}\n\nThis will use REAL MONEY!\n\nAre you absolutely sure?`);
                 if (!confirmed) {
                     addLog('❌ Live trade cancelled by user', 'warning');
@@ -1107,7 +1099,7 @@
                 }
             } else {
                 // DEMO TRADING
-                const currentPrice = getCurrentPrice();
+                const currentPrice = getCurrentPrice(currentTicker);
                 const tradeValue = (currentPrice * quantity).toFixed(2);
 
                 const trade = {
@@ -1126,7 +1118,7 @@
                 const pnlChange = action === 'buy' ? -trade.value : trade.value;
                 updatePnL(pnlChange);
 
-                addLog(`💰 DEMO: ${action.toUpperCase()} ${quantity} shares of ${currentTicker} at ${currentPrice} (Total: ${tradeValue})`, 'success');
+                addLog(`💰 DEMO: ${action.toUpperCase()} ${quantity} shares of ${currentTicker} at ${currentPrice.toFixed(2)} (Total: ${tradeValue})`, 'success');
                 showTradeNotification(action, quantity, currentTicker, currentPrice);
             }
         }
@@ -1141,7 +1133,7 @@
             `;
             notification.innerHTML = `
                 ✅ ${action.toUpperCase()} Order Executed<br>
-                ${quantity} shares of ${symbol} @ ${price}
+                ${quantity} shares of ${symbol} @ ${price.toFixed(2)}
             `;
 
             document.body.appendChild(notification);
@@ -1312,15 +1304,22 @@
             addLog('🗑️ Strategy cleared', 'info');
         }
 
-        // Price and data functions
-        function getCurrentPrice() {
-            if (!currentTicker) return 0;
-            return demoStocks[currentTicker]?.price || Math.random() * 100 + 50;
+        // FIXED: Price and data functions
+        function getCurrentPrice(symbol = currentTicker) {
+            if (!symbol) return 0;
+            
+            // If it's a demo stock, return its current price
+            if (demoStocks[symbol]) {
+                return demoStocks[symbol].price;
+            }
+            
+            // For custom stocks, generate a realistic price
+            return Math.random() * 200 + 50;
         }
 
         function updateCurrentPrice() {
             if (!currentTicker) return;
-            const price = getCurrentPrice();
+            const price = getCurrentPrice(currentTicker);
             document.getElementById('currentPrice').textContent = `${price.toFixed(2)}`;
         }
 
@@ -1329,17 +1328,14 @@
             document.getElementById('rsi_5m').textContent = (Math.random() * 100).toFixed(2);
             document.getElementById('macd_1m').textContent = (Math.random() * 2 - 1).toFixed(3);
             
-            if (currentTicker && demoStocks[currentTicker]) {
-                document.getElementById('volume').textContent = demoStocks[currentTicker].volume.toLocaleString();
+            if (currentTicker) {
+                const volume = demoStocks[currentTicker]?.volume || Math.random() * 100000000;
+                document.getElementById('volume').textContent = Math.floor(volume).toLocaleString();
             }
             
             const signals = ['BUY', 'SELL', 'HOLD'];
             const signal = signals[Math.floor(Math.random() * signals.length)];
             document.getElementById('customIndicatorValue').textContent = signal;
-            document.getElementById('signalText').textContent = signal;
-            
-            const signalDisplay = document.getElementById('signalDisplay');
-            signalDisplay.className = `signal-display signal-${signal.toLowerCase()}`;
         }
 
         function updatePnL(change) {
@@ -1375,7 +1371,103 @@
             tradesList.innerHTML = html;
         }
 
-        // Chart and signal functions
+        // FIXED: Chart functions
+        function initializeChart() {
+            const chartCanvas = document.getElementById('chartCanvas');
+            const chartData = document.getElementById('chartData');
+            
+            // Show chart canvas initially
+            chartCanvas.style.display = 'flex';
+            chartData.style.display = 'block';
+            
+            // Initialize with no stock selected
+            updateChart();
+        }
+
+        function updateChart() {
+            const chartHeader = document.getElementById('chartHeader');
+            const chartData = document.getElementById('chartData');
+            const priceBars = document.getElementById('priceBars');
+            
+            if (!currentTicker) {
+                chartHeader.textContent = '📊 LIVE CHART - SELECT STOCK';
+                chartData.innerHTML = 'Price: $0.00 | Volume: 0 | Timeframe: 1M';
+                priceBars.innerHTML = '';
+                return;
+            }
+            
+            const price = getCurrentPrice(currentTicker);
+            const volume = demoStocks[currentTicker]?.volume || Math.random() * 100000000;
+            
+            // Update chart header
+            chartHeader.textContent = `📊 ${currentTicker} - ${currentTimeframe.toUpperCase()}`;
+            
+            // Update chart data
+            chartData.innerHTML = `
+                Price: ${price.toFixed(2)} | Volume: ${(volume / 1000000).toFixed(1)}M | ${currentTimeframe.toUpperCase()}
+            `;
+            
+            // Generate price bars
+            generatePriceBars(price);
+        }
+
+        function generatePriceBars(basePrice) {
+            const priceBars = document.getElementById('priceBars');
+            let html = '';
+            
+            // Generate 20 price bars with realistic variation
+            for (let i = 0; i < 20; i++) {
+                const variation = (Math.random() - 0.5) * 0.1; // 10% variation
+                const price = basePrice * (1 + variation);
+                const height = Math.max(20, (price / basePrice) * 100);
+                
+                html += `
+                    <div class="price-bar" style="height: ${height}px;" title="${price.toFixed(2)}"></div>
+                `;
+            }
+            
+            priceBars.innerHTML = html;
+        }
+
+        function changeTimeframe(timeframe, buttonElement) {
+            currentTimeframe = timeframe;
+            
+            // Update active button
+            document.querySelectorAll('.chart-btn').forEach(btn => btn.classList.remove('active'));
+            buttonElement.classList.add('active');
+            
+            // Update chart with new timeframe
+            updateChart();
+            addLog(`📊 Chart timeframe changed to ${timeframe.toUpperCase()}`, 'info');
+        }
+
+        // FIXED: Running P&L functions
+        function updateRunningPnL() {
+            if (!currentTicker || !entryPrice) {
+                document.getElementById('runningPnL').textContent = '$0.00';
+                document.getElementById('entryPrice').textContent = '$0.00';
+                document.getElementById('currentPriceRunning').textContent = '$0.00';
+                document.getElementById('priceChange').textContent = '$0.00';
+                
+                const runningPnLElement = document.getElementById('runningPnL');
+                runningPnLElement.className = 'running-pnl-value';
+                return;
+            }
+            
+            const currentPrice = getCurrentPrice(currentTicker);
+            const change = currentPrice - entryPrice;
+            const changePercent = ((change / entryPrice) * 100);
+            
+            document.getElementById('entryPrice').textContent = `${entryPrice.toFixed(2)}`;
+            document.getElementById('currentPriceRunning').textContent = `${currentPrice.toFixed(2)}`;
+            document.getElementById('priceChange').textContent = `${change.toFixed(2)} (${changePercent.toFixed(2)}%)`;
+            
+            const runningPnLElement = document.getElementById('runningPnL');
+            runningPnLElement.textContent = `${change.toFixed(2)}`;
+            runningPnLElement.className = `running-pnl-value ${change >= 0 ? 'running-pnl-positive' : 'running-pnl-negative'}`;
+        }
+
+        // Signal functions
         function cycleSignal() {
             const signals = ['HOLD', 'BUY', 'SELL'];
             const currentIndex = signals.indexOf(currentSignal);
@@ -1389,54 +1481,6 @@
             signalDisplay.className = `signal-display signal-${currentSignal.toLowerCase()}`;
             
             addLog(`🎯 Manual signal changed to: ${currentSignal}`, 'info');
-        }
-
-        function updateChart() {
-            if (!currentTicker) return;
-            
-            const price = getCurrentPrice();
-            const volume = demoStocks[currentTicker]?.volume || 0;
-            
-            // Update chart data display
-            document.getElementById('chartData').innerHTML = `
-                Price: ${price.toFixed(2)} | Volume: ${(volume / 1000000).toFixed(1)}M | ${currentTimeframe.toUpperCase()}
-            `;
-            
-            // Update chart placeholder
-            const placeholder = document.querySelector('.chart-placeholder');
-            if (placeholder) {
-                placeholder.innerHTML = `
-                    <div>📊 Live Chart for ${currentTicker}</div>
-                    <div style="font-size: 14px; margin-top: 10px; opacity: 0.8;">
-                        Timeframe: ${currentTimeframe.toUpperCase()}
-                    </div>
-                    <div style="font-size: 12px; margin-top: 15px; color: #22c55e;">
-                        Price: ${price.toFixed(2)} | Volume: ${(volume / 1000000).toFixed(1)}M
-                    </div>
-                `;
-            }
-        }
-
-        function updateRunningPnL() {
-            if (!currentTicker || !entryPrice) {
-                document.getElementById('runningPnL').textContent = '$0.00';
-                document.getElementById('entryPrice').textContent = '$0.00';
-                document.getElementById('currentPriceRunning').textContent = '$0.00';
-                document.getElementById('priceChange').textContent = '$0.00';
-                return;
-            }
-            
-            const currentPrice = getCurrentPrice();
-            const change = currentPrice - entryPrice;
-            const changePercent = ((change / entryPrice) * 100);
-            
-            document.getElementById('entryPrice').textContent = `${entryPrice.toFixed(2)}`;
-            document.getElementById('currentPriceRunning').textContent = `${currentPrice.toFixed(2)}`;
-            document.getElementById('priceChange').textContent = `${change.toFixed(2)} (${changePercent.toFixed(2)}%)`;
-            
-            const runningPnLElement = document.getElementById('runningPnL');
-            runningPnLElement.textContent = `${change.toFixed(2)}`;
-            runningPnLElement.className = `running-pnl-value ${change >= 0 ? 'running-pnl-positive' : 'running-pnl-negative'}`;
         }
 
         // Watchlist functions
@@ -1464,7 +1508,6 @@
             }
             
             userWatchlist = symbols;
-            localStorage.setItem('userWatchlist', JSON.stringify(userWatchlist));
             
             // Update watchlist display
             loadUserWatchlist();
@@ -1478,7 +1521,6 @@
 
         function loadDefaultWatchlist() {
             userWatchlist = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'SPY', 'QQQ', 'PLTR'];
-            localStorage.setItem('userWatchlist', JSON.stringify(userWatchlist));
             loadUserWatchlist();
             addLog('🔄 Default watchlist loaded', 'info');
         }
@@ -1507,6 +1549,7 @@
             
             container.innerHTML = html;
         }
+
         function loadDemoWatchlist() {
             const container = document.getElementById('watchlistContainer');
             let html = '';
@@ -1527,24 +1570,13 @@
         }
 
         function selectWatchlistStock(symbol) {
-            currentTicker = symbol;
-            entryPrice = getCurrentPrice(); // Set entry price for running P&L
-            document.getElementById('ticker').value = symbol;
-            document.getElementById('customTicker').value = '';
-            document.getElementById('chartSymbol').textContent = symbol;
-            updateCurrentPrice();
-            updateChart();
-            updateRunningPnL();
-            addLog(`📊 Selected from watchlist: ${symbol} (Entry: ${entryPrice.toFixed(2)})`, 'info');
+            selectStock(symbol);
+            addLog(`📊 Selected from watchlist: ${symbol}`, 'info');
         }
 
         function refreshWatchlist() {
             loadUserWatchlist();
             addLog('🔄 Watchlist refreshed', 'info');
-        }
-
-        function editWatchlist() {
-            toggleWatchlistEdit();
         }
 
         // Scanner functions
@@ -1582,19 +1614,6 @@
             addLog('🛑 Market scan stopped', 'info');
         }
 
-        // Chart functions
-        function changeTimeframe(timeframe, buttonElement) {
-            currentTimeframe = timeframe;
-            
-            // Update active button
-            document.querySelectorAll('.chart-btn').forEach(btn => btn.classList.remove('active'));
-            buttonElement.classList.add('active');
-            
-            // Update chart with new timeframe
-            updateChart();
-            addLog(`📊 Chart timeframe changed to ${timeframe.toUpperCase()}`, 'info');
-        }
-
         // Utility functions
         function showLogs() {
             const logsPanel = document.getElementById('logsPanel');
@@ -1610,26 +1629,31 @@
             alert('📖 Trading Manual\n\nFynda Auto Trading BOT User Guide\n\n• Demo Mode: Safe testing with simulated data\n• Live Mode: Real trading with Schwab connection\n• Auto Trading: Custom ThinkOrSwim strategies\n• Emergency Stop: Instant halt of all trading\n• Hold Mode: Temporarily disable trading\n\nFor full documentation, visit our website.');
         }
 
-        // Auto-refresh and updates
+        // FIXED: Auto-refresh and updates
         function startPriceUpdates() {
             priceUpdateInterval = setInterval(() => {
-                if (currentTicker) {
-                    updateCurrentPrice();
-                    updateIndicators();
-                    updateChart(); // Update chart with new price data
-                }
-                
-                // Update watchlist prices
+                // Update demo stock prices with realistic movements
                 Object.keys(demoStocks).forEach(symbol => {
-                    const change = (Math.random() - 0.5) * 2;
-                    demoStocks[symbol].price += change;
-                    demoStocks[symbol].change += change;
+                    const change = (Math.random() - 0.5) * 0.02; // 2% max change
+                    demoStocks[symbol].price *= (1 + change);
+                    demoStocks[symbol].change += (change * demoStocks[symbol].price);
                 });
                 
-                if (document.getElementById('watchlistContainer').innerHTML !== '') {
-                    loadUserWatchlist();
+                // Update current stock data if selected
+                if (currentTicker) {
+                    updateCurrentPrice();
+                    updateChart();
+                    updateRunningPnL();
                 }
-            }, 3000);
+                
+                // Update indicators
+                updateIndicators();
+                
+                // Update watchlist
+                if (document.getElementById('watchlistContainer').innerHTML !== '') {
+                    loadDemoWatchlist();
+                }
+            }, 3000); // Update every 3 seconds
         }
 
         // Initialize app
