@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Schwab Authorization</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0f1419 0%, #1a202c 50%, #2d3748 100%);
+            color: white;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 50px auto; 
+            background: rgba(255, 255, 255, 0.1); 
+            padding: 30px; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+        }
+        .title {
+            font-size: 2em;
+            color: #4facfe;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .code { 
+            background: rgba(0, 0, 0, 0.3); 
+            padding: 20px; 
+            border-radius: 10px; 
+            font-family: 'Courier New', monospace; 
+            font-size: 16px; 
+            margin: 20px 0; 
+            word-break: break-all; 
+            border: 2px solid #4facfe;
+            text-align: center;
+        }
+        .button { 
+            background: #4facfe; 
+            color: white; 
+            padding: 12px 24px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            margin: 10px 5px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .button:hover { 
+            background: #3b82f6; 
+            transform: translateY(-2px);
+        }
+        .success { color: #22c55e; }
+        .error { color: #ef4444; }
+        .instructions {
+            background: rgba(79, 172, 254, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .step {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            border-left: 3px solid #4facfe;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">🔐 Schwab Authorization</div>
+        <div id="content">
+            <div class="instructions">
+                <h3>⏳ Processing authorization...</h3>
+                <p>Please wait while we extract your authorization code from Schwab.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const error = urlParams.get('error');
+            const contentDiv = document.getElementById('content');
+
+            if (error) {
+                contentDiv.innerHTML = `
+                    <div class="instructions">
+                        <h2 class="error">❌ Authorization Failed</h2>
+                        <p><strong>Error:</strong> ${error}</p>
+                        <p>This usually happens when:</p>
+                        <ul>
+                            <li>You cancelled the authorization</li>
+                            <li>Your session expired</li>
+                            <li>There was a network issue</li>
+                        </ul>
+                        <div class="step">
+                            <strong>What to do:</strong> Close this window and try connecting again from your trading app.
+                        </div>
+                    </div>
+                    <div style="text-align: center;">
+                        <button class="button" onclick="window.close()">Close Window</button>
+                    </div>
+                `;
+            } else if (code) {
+                contentDiv.innerHTML = `
+                    <div class="instructions">
+                        <h2 class="success">✅ Authorization Successful!</h2>
+                        <p>Schwab has successfully authorized your trading app. Copy the code below and return to your main trading app:</p>
+                    </div>
+                    
+                    <div class="code" id="authCode">${code}</div>
+                    
+                    <div style="text-align: center;">
+                        <button class="button" onclick="copyCode()">📋 Copy Authorization Code</button>
+                        <button class="button" onclick="returnToApp()">🔙 Return to Trading App</button>
+                    </div>
+                    
+                    <div class="instructions">
+                        <h3>🚀 Next Steps:</h3>
+                        
+                        <div class="step">
+                            <strong>1.</strong> Copy the authorization code above
+                        </div>
+                        
+                        <div class="step">
+                            <strong>2.</strong> Return to your trading app window
+                        </div>
+                        
+                        <div class="step">
+                            <strong>3.</strong> Paste the code in the "Enter authorization code" field
+                        </div>
+                        
+                        <div class="step">
+                            <strong>4.</strong> Click "Complete Connection"
+                        </div>
+                        
+                        <div class="step">
+                            <strong>5.</strong> Start trading with live data!
+                        </div>
+                    </div>
+                `;
+            } else {
+                contentDiv.innerHTML = `
+                    <div class="instructions">
+                        <h2 class="error">❌ No Authorization Code Found</h2>
+                        <p>No authorization code was found in the URL. This page is working correctly, but no OAuth callback was received.</p>
+                        <div class="step">
+                            <strong>What to do:</strong> This usually means you accessed this page directly. Please start the authorization process from your trading app.
+                        </div>
+                    </div>
+                    <div style="text-align: center;">
+                        <button class="button" onclick="returnToApp()">🔙 Go to Trading App</button>
+                    </div>
+                `;
+            }
+        });
+
+        function copyCode() {
+            const codeElement = document.getElementById('authCode');
+            const code = codeElement.textContent;
+            
+            // Try modern clipboard API first
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(code).then(function() {
+                    showCopySuccess();
+                }).catch(function(err) {
+                    console.error('Clipboard API failed:', err);
+                    fallbackCopyToClipboard(codeElement);
+                });
+            } else {
+                // Fallback for older browsers or non-HTTPS
+                fallbackCopyToClipboard(codeElement);
+            }
+        }
+
+        function fallbackCopyToClipboard(element) {
+            // Select the text
+            const range = document.createRange();
+            range.selectNode(element);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            
+            try {
+                // Try to copy using execCommand
+                document.execCommand('copy');
+                showCopySuccess();
+            } catch (err) {
+                console.error('Copy failed:', err);
+                alert('❌ Auto-copy failed. Please manually select and copy the code above.\n\nPress Ctrl+C (or Cmd+C on Mac) to copy.');
+            }
+            
+            // Clear selection
+            window.getSelection().removeAllRanges();
+        }
+
+        function showCopySuccess() {
+            const button = document.querySelector('.button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '✅ Copied!';
+            button.style.background = '#22c55e';
+            
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.style.background = '#4facfe';
+            }, 3000);
+        }
+
+        function returnToApp() {
+            // Try to return to the main trading app
+            const appUrl = 'https://day-trading-app-production.up.railway.app';
+            
+            try {
+                // If opened from the same domain, try to access parent window
+                if (window.opener && !window.opener.closed) {
+                    window.opener.focus();
+                    window.close();
+                } else {
+                    // Otherwise, open in current window
+                    window.location.href = appUrl;
+                }
+            } catch (e) {
+                // If all else fails, just navigate to the app
+                window.location.href = appUrl;
+            }
+        }
+
+        console.log('🔐 Schwab OAuth callback page loaded');
+        console.log('📍 Current URL:', window.location.href);
+        
+        // Log URL parameters for debugging
+        const urlParams = new URLSearchParams(window.location.search);
+        console.log('🔍 URL Parameters:', Object.fromEntries(urlParams));
+    </script>
+</body>
+</html>
