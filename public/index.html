@@ -422,6 +422,17 @@
                 
                 <div style="margin: 20px 0;">
                     <input type="text" id="authCode" class="auth-input" placeholder="Enter authorization code here..." style="display: none;">
+                    <div id="authInstructions" style="display: none; text-align: left; font-size: 14px; margin: 10px 0; padding: 15px; background: rgba(79, 172, 254, 0.1); border-radius: 8px;">
+                        <strong>How to get your authorization code:</strong><br>
+                        1. After clicking "Connect to Schwab Live", a popup will open<br>
+                        2. Log in to your Schwab account in the popup<br>
+                        3. After successful login, the popup will redirect to a URL like:<br>
+                        <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-size: 12px;">
+                        https://day-trading-app-production.up.railway.app/callback.html?code=YOUR_CODE_HERE
+                        </code><br>
+                        4. Copy ONLY the code part (everything after "code=") from the URL<br>
+                        5. Paste it in the field below and click "Complete Connection"
+                    </div>
                     <button class="auth-button" id="completeAuthBtn" onclick="completeAuth()" style="display: none;">
                         Complete Connection
                     </button>
@@ -725,12 +736,36 @@
 
             async getTokens(authorizationCode) {
                 try {
-                    // Decode the authorization code if it's URL encoded
-                    const decodedCode = decodeURIComponent(authorizationCode);
+                    // Clean and validate the authorization code
+                    let cleanCode = authorizationCode.trim();
                     
+                    // Remove any URL fragments or query parameters that might have been included
+                    if (cleanCode.includes('?')) {
+                        cleanCode = cleanCode.split('?')[0];
+                    }
+                    if (cleanCode.includes('#')) {
+                        cleanCode = cleanCode.split('#')[0];
+                    }
+                    
+                    // Remove common prefixes that users might accidentally include
+                    if (cleanCode.startsWith('code=')) {
+                        cleanCode = cleanCode.substring(5);
+                    }
+                    
+                    console.log('🔄 Processing authorization code:', {
+                        originalLength: authorizationCode.length,
+                        cleanedLength: cleanCode.length,
+                        hasSpecialChars: /[^a-zA-Z0-9\-_]/.test(cleanCode)
+                    });
+                    
+                    if (!cleanCode || cleanCode.length < 10) {
+                        throw new Error('Authorization code appears to be invalid or too short');
+                    }
+                    
+                    // Prepare the request body
                     const requestBody = new URLSearchParams({
                         grant_type: 'authorization_code',
-                        code: decodedCode,
+                        code: cleanCode,
                         redirect_uri: this.redirectUri,
                         client_id: this.clientId
                     });
@@ -739,7 +774,8 @@
                         url: this.tokenUrl,
                         clientId: this.clientId,
                         redirectUri: this.redirectUri,
-                        codeLength: decodedCode.length
+                        codeLength: cleanCode.length,
+                        bodyKeys: Array.from(requestBody.keys())
                     });
 
                     const response = await fetch(this.tokenUrl, {
@@ -753,28 +789,55 @@
                     });
 
                     console.log('📡 Token response status:', response.status);
+                    console.log('📡 Token response headers:', Object.fromEntries(response.headers.entries()));
                     
                     const responseText = await response.text();
-                    console.log('📡 Token response:', responseText);
+                    console.log('📡 Token response body:', responseText);
 
                     if (!response.ok) {
                         let errorMessage = `HTTP ${response.status}`;
                         try {
                             const errorData = JSON.parse(responseText);
-                            errorMessage = errorData.error_description || errorData.error || errorMessage;
-                        } catch (e) {
-                            errorMessage = responseText;
+                            console.log('📡 Error data:', errorData);
+                            
+                            if (errorData.error_description) {
+                                errorMessage = errorData.error_description;
+                            } else if (errorData.error) {
+                                errorMessage = errorData.error;
+                            } else if (errorData.message) {
+                                errorMessage = errorData.message;
+                            }
+                            
+                            // Handle specific Schwab API errors
+                            if (errorData.error === 'invalid_grant') {
+                                errorMessage = 'Invalid or expired authorization code. Please generate a new code and try again.';
+                            } else if (errorData.error === 'invalid_client') {
+                                errorMessage = 'Client authentication failed. Please check your app configuration.';
+                            } else if (errorData.error === 'invalid_request') {
+                                errorMessage = 'Invalid request format. Please ensure you copied the complete authorization code.';
+                            }
+                        } catch (parseError) {
+                            console.log('Failed to parse error response:', parseError);
+                            errorMessage = responseText || errorMessage;
                         }
-                        throw new Error(`Token request failed: ${errorMessage}`);
+                        
+                        throw new Error(errorMessage);
                     }
 
                     const data = JSON.parse(responseText);
+                    console.log('✅ Token data received:', Object.keys(data));
+                    
+                    if (!data.access_token) {
+                        throw new Error('No access token received from Schwab API');
+                    }
                     
                     this.accessToken = data.access_token;
                     this.refreshToken = data.refresh_token;
                     this.tokenExpiry = Date.now() + (data.expires_in * 1000);
                     
                     console.log('✅ Successfully obtained Schwab tokens');
+                    console.log('✅ Token expires in:', data.expires_in, 'seconds');
+                    
                     return true;
                 } catch (error) {
                     console.error('❌ Failed to get tokens:', error);
@@ -1043,22 +1106,69 @@
             try {
                 const authUrl = window.schwabAPI.getAuthorizationUrl();
                 console.log('🔗 Opening authorization URL:', authUrl);
-                window.open(authUrl, '_blank', 'width=600,height=700');
                 
+                // Open the authorization URL
+                const authWindow = window.open(authUrl, 'schwab_auth', 'width=600,height=700,scrollbars=yes');
+                
+                // Show input field and instructions
                 document.getElementById('authCode').style.display = 'block';
+                document.getElementById('authInstructions').style.display = 'block';
                 document.getElementById('completeAuthBtn').style.display = 'block';
                 
+                // Focus on the input field
+                setTimeout(() => {
+                    document.getElementById('authCode').focus();
+                }, 500);
+                
+                // Check if the popup was blocked
+                if (!authWindow) {
+                    alert('❌ Popup blocked! Please allow popups for this site and try again.\n\nAlternatively, you can manually navigate to:\n' + authUrl);
+                }
+                
                 addLog('🔗 Authorization window opened - complete auth in popup', 'info');
+                addLog('📋 Follow the instructions to get your authorization code', 'info');
             } catch (error) {
                 console.error('❌ Failed to start auth:', error);
                 alert('❌ Failed to start authorization. Please check the console for details.');
             }
         }
 
+        // Helper function to validate authorization code format
+        function validateAuthCode(code) {
+            const cleanCode = code.trim();
+            
+            // Basic validation
+            if (!cleanCode) {
+                return { valid: false, error: 'Authorization code is empty' };
+            }
+            
+            if (cleanCode.length < 10) {
+                return { valid: false, error: 'Authorization code appears to be too short' };
+            }
+            
+            // Check for common mistakes
+            if (cleanCode.includes('http')) {
+                return { valid: false, error: 'Please copy only the code part, not the entire URL' };
+            }
+            
+            if (cleanCode.includes('callback.html')) {
+                return { valid: false, error: 'Please copy only the code part after "code=" from the URL' };
+            }
+            
+            if (cleanCode.includes('?') || cleanCode.includes('&')) {
+                return { valid: false, error: 'Authorization code should not contain ? or & characters' };
+            }
+            
+            return { valid: true, error: null };
+        }
+
         async function completeAuth() {
             const authCode = document.getElementById('authCode').value.trim();
-            if (!authCode) {
-                alert('Please enter the authorization code');
+            
+            // Validate the authorization code first
+            const validation = validateAuthCode(authCode);
+            if (!validation.valid) {
+                alert(`❌ Invalid authorization code: ${validation.error}\n\nPlease check the instructions above and try again.`);
                 return;
             }
 
@@ -1099,19 +1209,21 @@
                 addLog(`❌ Authentication failed: ${error.message}`, 'error');
                 
                 let errorMessage = error.message;
+                let troubleshooting = `Troubleshooting:\n1. Make sure you copied the ENTIRE authorization code\n2. Copy only the code part (after "code=") from the callback URL\n3. Try generating a new code\n4. Ensure your Schwab account is properly set up`;
                 
                 // Handle specific error cases
-                if (error.message.includes('400')) {
-                    errorMessage = 'Invalid authorization code. Please make sure you copied the complete code from the callback URL.';
+                if (error.message.includes('invalid_grant') || error.message.includes('Invalid or expired')) {
+                    errorMessage = 'The authorization code is invalid or has expired.';
+                    troubleshooting = `Please:\n1. Close this dialog\n2. Click "Connect to Schwab Live" again\n3. Complete the authorization process\n4. Copy the NEW code from the callback URL\n5. Make sure to copy ONLY the code part (everything after "code=")`;
+                } else if (error.message.includes('invalid_client')) {
+                    errorMessage = 'Client authentication failed. There may be an issue with the app configuration.';
+                } else if (error.message.includes('400')) {
+                    errorMessage = 'Invalid request format. Please ensure you copied the complete authorization code correctly.';
                 } else if (error.message.includes('500')) {
-                    errorMessage = 'Schwab API server error. Please try again in a few minutes or contact support.';
-                } else if (error.message.includes('401')) {
-                    errorMessage = 'Authentication failed. Please check your credentials and try again.';
-                } else if (error.message.includes('403')) {
-                    errorMessage = 'Access forbidden. Please ensure your app has the correct permissions.';
+                    errorMessage = 'Schwab API server error. Please try again in a few minutes.';
                 }
                 
-                alert(`❌ Authentication failed: ${errorMessage}\n\nTroubleshooting:\n1. Make sure you copied the ENTIRE authorization code\n2. Try generating a new code\n3. Check that your Schwab account is properly set up\n4. Contact support if the issue persists`);
+                alert(`❌ Authentication failed: ${errorMessage}\n\n${troubleshooting}`);
             }
         }
 
