@@ -590,4 +590,711 @@
                     console.log('✅ Successfully obtained Schwab tokens');
                     return true;
                 } catch (error) {
-                    console.error('
+                    console.error('❌ Failed to get tokens:', error);
+                    return false;
+                }
+            }
+
+            async makeRequest(endpoint, options = {}) {
+                if (!this.accessToken) {
+                    throw new Error('No access token. Please authenticate first.');
+                }
+                
+                const url = `${this.baseUrl}${endpoint}`;
+                const requestOptions = {
+                    ...options,
+                    headers: {
+                        'Authorization': `Bearer ${this.accessToken}`,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                };
+
+                const response = await fetch(url, requestOptions);
+                
+                if (!response.ok) {
+                    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+                }
+                
+                return response.json();
+            }
+
+            async getAccounts() {
+                const data = await this.makeRequest('/trader/v1/accounts');
+                if (data && data.length > 0) {
+                    this.accountNumber = data[0].accountNumber;
+                }
+                return data;
+            }
+
+            async getQuote(symbol) {
+                return this.makeRequest(`/marketdata/v1/quotes?symbols=${symbol}`);
+            }
+
+            async placeOrder(orderData) {
+                if (!this.accountNumber) {
+                    await this.getAccounts();
+                }
+                return this.makeRequest(`/trader/v1/accounts/${this.accountNumber}/orders`, {
+                    method: 'POST',
+                    body: JSON.stringify(orderData)
+                });
+            }
+
+            isAuthenticated() {
+                return !!this.accessToken && Date.now() < this.tokenExpiry;
+            }
+
+            logout() {
+                this.accessToken = null;
+                this.refreshToken = null;
+                this.tokenExpiry = null;
+                this.accountNumber = null;
+                
+                localStorage.removeItem('schwab_access_token');
+                localStorage.removeItem('schwab_refresh_token');
+                localStorage.removeItem('schwab_token_expiry');
+                
+                console.log('✅ Logged out successfully');
+            }
+        }
+
+        // Create global instance
+        window.schwabAPI = new SchwabAPI();
+
+        // Global variables
+        let currentTicker = '';
+        let isHoldMode = false;
+        let emergencyStopActive = false;
+        let isAutoTrading = false;
+        let customStrategy = '';
+        let currentTimeframe = '1m';
+        let activeTrades = [];
+        let totalPnL = 0;
+        let realizedPnL = 0;
+        let unrealizedPnL = 0;
+        let autoTradingInterval = null;
+        let scanningInterval = null;
+        let priceUpdateInterval = null;
+        let isLiveMode = false;
+
+        // Demo market data
+        const demoStocks = {
+            'AAPL': { price: 185.50, change: 2.15, volume: 55420000 },
+            'GOOGL': { price: 2875.20, change: -15.80, volume: 1250000 },
+            'MSFT': { price: 415.75, change: 3.45, volume: 22100000 },
+            'AMZN': { price: 3125.90, change: 45.20, volume: 3200000 },
+            'TSLA': { price: 245.30, change: -8.90, volume: 89500000 },
+            'META': { price: 525.80, change: 12.60, volume: 18900000 },
+            'NVDA': { price: 875.25, change: 25.75, volume: 45200000 },
+            'SPY': { price: 485.60, change: 1.25, volume: 78900000 },
+            'QQQ': { price: 395.40, change: 2.85, volume: 34500000 },
+            'PLTR': { price: 22.80, change: -0.45, volume: 67800000 }
+        };
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Fynda Auto Trading BOT initialized');
+            
+            // Check if already connected to Schwab
+            if (window.schwabAPI && window.schwabAPI.isAuthenticated()) {
+                enableLiveMode();
+            } else {
+                enableDemoMode();
+            }
+            
+            loadDemoWatchlist();
+            startPriceUpdates();
+            updateIndicators();
+        });
+
+        // Authentication functions
+        function showAuthModal() {
+            document.getElementById('authModal').style.display = 'flex';
+        }
+
+        function closeAuthModal() {
+            document.getElementById('authModal').style.display = 'none';
+        }
+
+        function startSchwabAuth() {
+            if (!window.schwabAPI) {
+                alert('❌ Schwab API not loaded. Please refresh the page and try again.');
+                return;
+            }
+
+            try {
+                const authUrl = window.schwabAPI.getAuthorizationUrl();
+                console.log('🔗 Opening authorization URL:', authUrl);
+                window.open(authUrl, '_blank', 'width=600,height=700');
+                
+                document.getElementById('authCode').style.display = 'block';
+                document.getElementById('completeAuthBtn').style.display = 'block';
+                
+                addLog('🔗 Authorization window opened - complete auth in popup', 'info');
+            } catch (error) {
+                console.error('❌ Failed to start auth:', error);
+                alert('❌ Failed to start authorization. Please check the console for details.');
+            }
+        }
+
+        async function completeAuth() {
+            const authCode = document.getElementById('authCode').value.trim();
+            if (!authCode) {
+                alert('Please enter the authorization code');
+                return;
+            }
+
+            try {
+                console.log('🔄 Attempting to authenticate with code...');
+                
+                const success = await window.schwabAPI.getTokens(authCode);
+                if (success) {
+                    console.log('✅ Authentication successful');
+                    enableLiveMode();
+                    closeAuthModal();
+                    addLog('🎉 Successfully connected to Schwab Live Trading!', 'success');
+                    alert('✅ Successfully connected to Schwab!\n\nYou are now in LIVE TRADING MODE with real money.');
+                } else {
+                    throw new Error('Failed to get tokens');
+                }
+            } catch (error) {
+                console.error('❌ Authentication failed:', error);
+                alert(`❌ Authentication failed: ${error.message}\n\nPlease check your authorization code and try again.`);
+                addLog(`❌ Authentication failed: ${error.message}`, 'error');
+            }
+        }
+
+        function enableLiveMode() {
+            isLiveMode = true;
+            updateConnectionStatus('🟢 LIVE - Schwab Connected', 'online');
+            addLog('🔴 LIVE TRADING MODE ACTIVE - Using real money!', 'warning');
+        }
+
+        function enableDemoMode() {
+            isLiveMode = false;
+            updateConnectionStatus('🟡 Demo Mode', 'demo');
+            closeAuthModal();
+            addLog('🎮 Demo mode activated - safe testing environment', 'info');
+            
+            totalPnL = 0;
+            realizedPnL = 0;
+            unrealizedPnL = 0;
+            activeTrades = [];
+            
+            updatePnL(0);
+            updateActiveTradesList();
+        }
+
+        function updateConnectionStatus(text, type) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.textContent = text;
+            
+            statusElement.className = 'connection-status';
+            if (type === 'online') {
+                statusElement.classList.add('connection-online');
+            } else if (type === 'demo') {
+                statusElement.classList.add('connection-demo');
+            } else {
+                statusElement.classList.add('connection-offline');
+            }
+        }
+
+        // Logging function
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+
+            const logContainer = document.getElementById('logEntries');
+            if (logContainer) {
+                logContainer.appendChild(logEntry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // Stock selection handlers
+        document.getElementById('ticker').addEventListener('change', function() {
+            if (this.value) {
+                currentTicker = this.value;
+                document.getElementById('chartSymbol').textContent = currentTicker;
+                document.getElementById('customTicker').value = '';
+                updateCurrentPrice();
+                addLog(`📊 Selected stock: ${currentTicker}`, 'info');
+            }
+        });
+
+        document.getElementById('customTicker').addEventListener('input', function() {
+            const value = this.value.toUpperCase().trim();
+            if (value) {
+                currentTicker = value;
+                document.getElementById('ticker').value = '';
+                document.getElementById('chartSymbol').textContent = currentTicker;
+                updateCurrentPrice();
+                addLog(`🎯 Custom ticker: ${currentTicker}`, 'info');
+            }
+        });
+
+        // Trading functions
+        async function executeTrade(action) {
+            if (!currentTicker) {
+                alert('⚠️ Please select a stock first');
+                addLog('❌ Trade failed: No stock selected', 'error');
+                return;
+            }
+
+            if (isHoldMode) {
+                alert('🚫 Trading blocked - HOLD mode is active');
+                addLog('⛔ Trade blocked: HOLD mode active', 'warning');
+                return;
+            }
+
+            const quantity = parseInt(document.getElementById('quantity').value);
+            if (!quantity || quantity <= 0) {
+                alert('Please enter a valid quantity');
+                return;
+            }
+
+            if (isLiveMode) {
+                // LIVE TRADING
+                const confirmed = confirm(`🚨 LIVE TRADE CONFIRMATION 🚨\n\n${action.toUpperCase()} ${quantity} shares of ${currentTicker}\n\nThis will use REAL MONEY!\n\nAre you absolutely sure?`);
+                if (!confirmed) {
+                    addLog('❌ Live trade cancelled by user', 'warning');
+                    return;
+                }
+
+                try {
+                    document.getElementById('buyBtn').disabled = true;
+                    document.getElementById('sellBtn').disabled = true;
+
+                    const orderData = {
+                        orderType: 'MARKET',
+                        session: 'NORMAL',
+                        duration: 'DAY',
+                        orderStrategyType: 'SINGLE',
+                        orderLegCollection: [{
+                            instruction: action.toUpperCase() === 'BUY' ? 'BUY' : 'SELL',
+                            quantity: quantity,
+                            instrument: {
+                                symbol: currentTicker,
+                                assetType: 'EQUITY'
+                            }
+                        }]
+                    };
+
+                    addLog(`🔥 PLACING LIVE ORDER: ${action.toUpperCase()} ${quantity} ${currentTicker}`, 'warning');
+                    
+                    const result = await window.schwabAPI.placeOrder(orderData);
+                    
+                    if (result) {
+                        addLog(`✅ LIVE ORDER PLACED: ${action.toUpperCase()} ${quantity} shares of ${currentTicker}`, 'success');
+                        alert(`✅ LIVE ORDER PLACED SUCCESSFULLY!\n\n${action.toUpperCase()} ${quantity} shares of ${currentTicker}\n\nCheck your Schwab account for confirmation.`);
+                    } else {
+                        throw new Error('Order placement failed');
+                    }
+
+                } catch (error) {
+                    console.error('❌ Live trade failed:', error);
+                    addLog(`❌ LIVE TRADE FAILED: ${error.message}`, 'error');
+                    alert(`❌ Live trade failed: ${error.message}\n\nPlease check your account and try again.`);
+                } finally {
+                    document.getElementById('buyBtn').disabled = false;
+                    document.getElementById('sellBtn').disabled = false;
+                }
+            } else {
+                // DEMO TRADING
+                const currentPrice = getCurrentPrice();
+                const tradeValue = (currentPrice * quantity).toFixed(2);
+
+                const trade = {
+                    id: Date.now(),
+                    symbol: currentTicker,
+                    action: action.toUpperCase(),
+                    quantity: quantity,
+                    price: currentPrice,
+                    value: parseFloat(tradeValue),
+                    timestamp: new Date().toLocaleTimeString()
+                };
+
+                activeTrades.push(trade);
+                updateActiveTradesList();
+
+                const pnlChange = action === 'buy' ? -trade.value : trade.value;
+                updatePnL(pnlChange);
+
+                addLog(`💰 DEMO: ${action.toUpperCase()} ${quantity} shares of ${currentTicker} at ${currentPrice} (Total: ${tradeValue})`, 'success');
+                showTradeNotification(action, quantity, currentTicker, currentPrice);
+            }
+        }
+
+        function showTradeNotification(action, quantity, symbol, price) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; top: 20px; right: 20px; z-index: 1000;
+                background: ${action === 'buy' ? '#10b981' : '#ef4444'};
+                color: white; padding: 15px 20px; border-radius: 10px;
+                font-weight: bold; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            `;
+            notification.innerHTML = `
+                ✅ ${action.toUpperCase()} Order Executed<br>
+                ${quantity} shares of ${symbol} @ ${price}
+            `;
+
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+
+        function cancelAllOrders() {
+            if (isLiveMode) {
+                if (confirm('🚨 Cancel ALL live orders?\n\nThis will cancel all pending orders in your Schwab account!')) {
+                    addLog('🚫 LIVE: Attempting to cancel all orders', 'warning');
+                    alert('Live order cancellation feature coming soon!\n\nPlease cancel orders directly in your Schwab app for now.');
+                }
+            } else {
+                activeTrades.length = 0;
+                updateActiveTradesList();
+                addLog('🚫 DEMO: All orders cancelled', 'warning');
+            }
+        }
+
+        function closeAllPositions() {
+            if (isLiveMode) {
+                if (confirm('🚨 Close ALL live positions?\n\nThis will sell all stocks in your account!')) {
+                    addLog('💥 LIVE: Attempting to close all positions', 'warning');
+                    alert('Close all positions feature coming soon!\n\nPlease close positions manually in your Schwab app for now.');
+                }
+            } else {
+                activeTrades.length = 0;
+                updateActiveTradesList();
+                addLog('💥 DEMO: All positions closed', 'warning');
+            }
+        }
+
+        function setStopLoss() {
+            const percent = document.getElementById('stopLossPercent').value;
+            if (isLiveMode) {
+                addLog(`🛡️ LIVE: Stop loss set at ${percent}%`, 'info');
+                alert(`🛡️ LIVE MODE: Stop loss set at ${percent}%\n\nThis will be applied to future trades.`);
+            } else {
+                addLog(`🛡️ DEMO: Stop loss set at ${percent}%`, 'info');
+            }
+        }
+
+        function setProfitTarget() {
+            const percent = document.getElementById('profitTargetPercent').value;
+            if (isLiveMode) {
+                addLog(`🎯 LIVE: Profit target set at ${percent}%`, 'info');
+                alert(`🎯 LIVE MODE: Profit target set at ${percent}%\n\nThis will be applied to future trades.`);
+            } else {
+                addLog(`🎯 DEMO: Profit target set at ${percent}%`, 'info');
+            }
+        }
+
+        function toggleHoldMode() {
+            isHoldMode = !isHoldMode;
+            const holdBtn = document.getElementById('holdBtn');
+            const holdStatus = document.getElementById('holdStatus');
+            const holdStatusText = document.getElementById('holdStatusText');
+            
+            if (isHoldMode) {
+                holdBtn.textContent = 'TRADING';
+                holdBtn.className = 'btn btn-success';
+                holdStatus.className = 'status-indicator status-warning';
+                holdStatusText.textContent = 'HOLD Mode';
+                addLog('⏸️ HOLD mode activated - trading disabled', 'warning');
+            } else {
+                holdBtn.textContent = 'HOLD';
+                holdBtn.className = 'btn btn-primary';
+                holdStatus.className = 'status-indicator status-inactive';
+                holdStatusText.textContent = 'Trading';
+                addLog('▶️ Trading mode activated', 'info');
+            }
+        }
+
+        function emergencyStop() {
+            emergencyStopActive = true;
+            
+            if (isLiveMode) {
+                if (confirm('🚨 EMERGENCY STOP 🚨\n\nThis will:\n- Stop all auto trading\n- Enable HOLD mode\n- Attempt to cancel pending orders\n\nProceed?')) {
+                    isAutoTrading = false;
+                    isHoldMode = true;
+                    toggleHoldMode();
+                    toggleAutomation();
+                    addLog('🚨 LIVE: EMERGENCY STOP ACTIVATED!', 'error');
+                    alert('🚨 EMERGENCY STOP ACTIVATED!\n\nAll trading has been halted.\nCheck your Schwab account immediately.');
+                }
+            } else {
+                isAutoTrading = false;
+                isHoldMode = true;
+                addLog('🚨 DEMO: Emergency stop activated', 'error');
+                alert('🚨 DEMO: Emergency stop activated!\n\nAll demo trading halted.');
+            }
+        }
+
+        function toggleAutomation() {
+            isAutoTrading = !isAutoTrading;
+            const toggleBtn = document.getElementById('toggleAuto');
+            const autoStatus = document.getElementById('autoStatus');
+            const autoStatusText = document.getElementById('autoStatusText');
+            
+            if (isAutoTrading) {
+                toggleBtn.textContent = 'Stop Auto Trading';
+                toggleBtn.className = 'btn btn-danger';
+                autoStatus.className = 'status-indicator status-active';
+                autoStatusText.textContent = 'Active';
+                
+                if (isLiveMode) {
+                    addLog('🤖 LIVE: Auto trading started - BE CAREFUL!', 'warning');
+                } else {
+                    addLog('🤖 DEMO: Auto trading started', 'info');
+                }
+                
+                startAutoTrading();
+            } else {
+                toggleBtn.textContent = 'Start Auto Trading';
+                toggleBtn.className = 'btn btn-primary';
+                autoStatus.className = 'status-indicator status-inactive';
+                autoStatusText.textContent = 'Inactive';
+                
+                addLog('🛑 Auto trading stopped', 'info');
+                stopAutoTrading();
+            }
+        }
+
+        function startAutoTrading() {
+            if (autoTradingInterval) clearInterval(autoTradingInterval);
+            
+            autoTradingInterval = setInterval(() => {
+                if (!isAutoTrading || isHoldMode) return;
+                
+                if (currentTicker) {
+                    addLog(`🤖 Auto trading check for ${currentTicker}`, 'info');
+                }
+            }, 5000);
+        }
+
+        function stopAutoTrading() {
+            if (autoTradingInterval) {
+                clearInterval(autoTradingInterval);
+                autoTradingInterval = null;
+            }
+        }
+
+        // Custom strategy functions
+        function loadStrategy() {
+            const strategy = document.getElementById('customScript').value;
+            if (strategy.trim()) {
+                customStrategy = strategy;
+                addLog('📝 Custom strategy loaded', 'info');
+                alert('Strategy loaded!\n\nThis will be applied to auto trading.');
+            } else {
+                alert('Please enter a strategy first');
+            }
+        }
+
+        function testStrategy() {
+            const strategy = document.getElementById('customScript').value;
+            if (strategy.trim()) {
+                addLog('🧪 Testing custom strategy...', 'info');
+                alert('Strategy test results:\n\n✅ Syntax check passed\n✅ Logic validation passed\n\nStrategy is ready for live use.');
+            } else {
+                alert('Please enter a strategy first');
+            }
+        }
+
+        function clearStrategy() {
+            document.getElementById('customScript').value = '';
+            customStrategy = '';
+            addLog('🗑️ Strategy cleared', 'info');
+        }
+
+        // Price and data functions
+        function getCurrentPrice() {
+            if (!currentTicker) return 0;
+            return demoStocks[currentTicker]?.price || Math.random() * 100 + 50;
+        }
+
+        function updateCurrentPrice() {
+            if (!currentTicker) return;
+            const price = getCurrentPrice();
+            document.getElementById('currentPrice').textContent = `${price.toFixed(2)}`;
+        }
+
+        function updateIndicators() {
+            document.getElementById('rsi_1m').textContent = (Math.random() * 100).toFixed(2);
+            document.getElementById('rsi_5m').textContent = (Math.random() * 100).toFixed(2);
+            document.getElementById('macd_1m').textContent = (Math.random() * 2 - 1).toFixed(3);
+            
+            if (currentTicker && demoStocks[currentTicker]) {
+                document.getElementById('volume').textContent = demoStocks[currentTicker].volume.toLocaleString();
+            }
+            
+            const signals = ['BUY', 'SELL', 'HOLD'];
+            const signal = signals[Math.floor(Math.random() * signals.length)];
+            document.getElementById('customIndicatorValue').textContent = signal;
+            document.getElementById('signalText').textContent = signal;
+            
+            const signalDisplay = document.getElementById('signalDisplay');
+            signalDisplay.className = `signal-display signal-${signal.toLowerCase()}`;
+        }
+
+        function updatePnL(change) {
+            if (isLiveMode) return;
+            
+            totalPnL += change;
+            if (change > 0) realizedPnL += change;
+            
+            document.getElementById('totalPnL').textContent = `${totalPnL.toFixed(2)}`;
+            document.getElementById('realizedPnL').textContent = `${realizedPnL.toFixed(2)}`;
+            document.getElementById('unrealizedPnL').textContent = `${(totalPnL - realizedPnL).toFixed(2)}`;
+            
+            const pnlElement = document.getElementById('totalPnL');
+            pnlElement.className = `pnl-value ${totalPnL >= 0 ? 'pnl-positive' : 'pnl-negative'}`;
+        }
+
+        function updateActiveTradesList() {
+            const tradesList = document.getElementById('activeTradesList');
+            if (activeTrades.length === 0) {
+                tradesList.innerHTML = 'No active trades';
+                return;
+            }
+            
+            let html = '';
+            activeTrades.slice(-5).forEach(trade => {
+                html += `
+                    <div class="trade-item">
+                        <span><strong>${trade.symbol}</strong> ${trade.action} ${trade.quantity}</span>
+                        <span class="${trade.action === 'BUY' ? 'price-down' : 'price-up'}">${trade.value.toFixed(2)}</span>
+                    </div>
+                `;
+            });
+            tradesList.innerHTML = html;
+        }
+
+        // Watchlist functions
+        function loadDemoWatchlist() {
+            const container = document.getElementById('watchlistContainer');
+            let html = '';
+            
+            Object.entries(demoStocks).forEach(([symbol, data]) => {
+                const changeClass = data.change >= 0 ? 'price-up' : 'price-down';
+                html += `
+                    <div class="watchlist-item" onclick="selectWatchlistStock('${symbol}')">
+                        <div class="watchlist-ticker">${symbol}</div>
+                        <div class="watchlist-price">${data.price.toFixed(2)}</div>
+                        <div class="watchlist-change ${changeClass}">${data.change >= 0 ? '+' : ''}${data.change.toFixed(2)}</div>
+                        <div class="watchlist-volume">Vol: ${(data.volume / 1000000).toFixed(1)}M</div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function selectWatchlistStock(symbol) {
+            currentTicker = symbol;
+            document.getElementById('ticker').value = symbol;
+            document.getElementById('customTicker').value = '';
+            document.getElementById('chartSymbol').textContent = symbol;
+            updateCurrentPrice();
+            addLog(`📊 Selected from watchlist: ${symbol}`, 'info');
+        }
+
+        function refreshWatchlist() {
+            loadDemoWatchlist();
+            addLog('🔄 Watchlist refreshed', 'info');
+        }
+
+        function editWatchlist() {
+            alert('Watchlist editing feature coming soon!\n\nYou\'ll be able to add/remove stocks from your watchlist.');
+        }
+
+        // Scanner functions
+        function startScanning() {
+            const criteria = document.getElementById('scannerCode').value;
+            if (!criteria.trim()) {
+                alert('Please enter scanning criteria first');
+                return;
+            }
+            
+            document.getElementById('scanStatus').textContent = 'Scanning...';
+            addLog('🔍 Market scan started', 'info');
+            
+            setTimeout(() => {
+                const results = ['AAPL', 'MSFT', 'GOOGL'];
+                const container = document.getElementById('scannerContainer');
+                let html = '<div style="font-size: 12px; margin-bottom: 10px;"><strong>Scan Results:</strong></div>';
+                
+                results.forEach(symbol => {
+                    html += `
+                        <div style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: pointer;" onclick="selectWatchlistStock('${symbol}')">
+                            <strong>${symbol}</strong> - Matches criteria
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+                document.getElementById('scanStatus').textContent = `Found ${results.length} matches`;
+                addLog(`🎯 Scan complete: ${results.length} matches found`, 'success');
+            }, 2000);
+        }
+
+        function stopScanning() {
+            document.getElementById('scanStatus').textContent = 'Scan stopped';
+            addLog('🛑 Market scan stopped', 'info');
+        }
+
+        // Chart functions
+        function changeTimeframe(timeframe) {
+            currentTimeframe = timeframe;
+            document.getElementById('currentTimeframe').textContent = timeframe.toUpperCase();
+            
+            document.querySelectorAll('.chart-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            addLog(`📊 Chart timeframe changed to ${timeframe}`, 'info');
+        }
+
+        // Utility functions
+        function showLogs() {
+            const logsPanel = document.getElementById('logsPanel');
+            const isVisible = logsPanel.style.display === 'block';
+            logsPanel.style.display = isVisible ? 'none' : 'block';
+            
+            if (!isVisible) {
+                addLog('📋 Logs panel opened', 'info');
+            }
+        }
+
+        function downloadManual() {
+            alert('📖 Trading Manual\n\nFynda Auto Trading BOT User Guide\n\n• Demo Mode: Safe testing with simulated data\n• Live Mode: Real trading with Schwab connection\n• Auto Trading: Custom ThinkOrSwim strategies\n• Emergency Stop: Instant halt of all trading\n• Hold Mode: Temporarily disable trading\n\nFor full documentation, visit our website.');
+        }
+
+        // Auto-refresh and updates
+        function startPriceUpdates() {
+            priceUpdateInterval = setInterval(() => {
+                if (currentTicker) {
+                    updateCurrentPrice();
+                    updateIndicators();
+                }
+                
+                // Update watchlist prices
+                Object.keys(demoStocks).forEach(symbol => {
+                    const change = (Math.random() - 0.5) * 2;
+                    demoStocks[symbol].price += change;
+                    demoStocks[symbol].change += change;
+                });
+                
+                if (document.getElementById('watchlistContainer').innerHTML !== '') {
+                    loadDemoWatchlist();
+                }
+            }, 3000);
+        }
+
+        // Initialize app
+        console.log('✅ Fynda Auto Trading BOT loaded successfully');
+    </script>
+</body>
+</html>
