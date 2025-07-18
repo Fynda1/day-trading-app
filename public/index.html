@@ -838,11 +838,45 @@
 
             async getAccounts() {
                 try {
+                    console.log('🔄 Fetching account information...');
                     const data = await this.makeRequest('/trader/v1/accounts');
+                    
+                    console.log('📋 Account data received:', data);
+                    
                     if (data && Array.isArray(data) && data.length > 0) {
-                        this.accountNumber = data[0].accountNumber;
-                        console.log('✅ Account number retrieved:', this.accountNumber);
+                        // Try different possible account number fields
+                        const account = data[0];
+                        this.accountNumber = account.accountNumber || 
+                                           account.accountId || 
+                                           account.hashValue || 
+                                           account.securitiesAccount?.accountNumber ||
+                                           account.securitiesAccount?.accountId;
+                        
+                        if (this.accountNumber) {
+                            console.log('✅ Account number retrieved:', this.accountNumber);
+                        } else {
+                            console.log('⚠️ Account data structure:', JSON.stringify(account, null, 2));
+                            throw new Error('Account number not found in response');
+                        }
+                    } else if (data && typeof data === 'object' && !Array.isArray(data)) {
+                        // Handle case where accounts are returned as object instead of array
+                        this.accountNumber = data.accountNumber || 
+                                           data.accountId || 
+                                           data.hashValue ||
+                                           data.securitiesAccount?.accountNumber ||
+                                           data.securitiesAccount?.accountId;
+                        
+                        if (this.accountNumber) {
+                            console.log('✅ Account number retrieved from object:', this.accountNumber);
+                        } else {
+                            console.log('⚠️ Account data structure:', JSON.stringify(data, null, 2));
+                            throw new Error('Account number not found in response');
+                        }
+                    } else {
+                        console.log('⚠️ No accounts found or invalid response format');
+                        throw new Error('No accounts found in response');
                     }
+                    
                     return data;
                 } catch (error) {
                     console.error('❌ Failed to get accounts:', error);
@@ -862,23 +896,46 @@
             async placeOrder(orderData) {
                 try {
                     if (!this.accountNumber) {
-                        console.log('🔄 Getting account number first...');
+                        console.log('🔄 No account number cached, fetching accounts...');
                         await this.getAccounts();
                     }
                     
                     if (!this.accountNumber) {
-                        throw new Error('No account number available');
+                        throw new Error('Unable to retrieve account number. Please ensure your Schwab account is properly set up and has trading permissions.');
                     }
                     
                     console.log('🔄 Placing order for account:', this.accountNumber);
                     console.log('📋 Order data:', JSON.stringify(orderData, null, 2));
                     
-                    return await this.makeRequest(`/trader/v1/accounts/${this.accountNumber}/orders`, {
+                    // Validate order data
+                    if (!orderData.orderLegCollection || !orderData.orderLegCollection.length) {
+                        throw new Error('Invalid order data: missing orderLegCollection');
+                    }
+                    
+                    const endpoint = `/trader/v1/accounts/${this.accountNumber}/orders`;
+                    console.log('🔄 Order endpoint:', endpoint);
+                    
+                    const result = await this.makeRequest(endpoint, {
                         method: 'POST',
                         body: JSON.stringify(orderData)
                     });
+                    
+                    console.log('✅ Order placement response:', result);
+                    return result;
                 } catch (error) {
                     console.error('❌ Failed to place order:', error);
+                    
+                    // Provide more specific error messages
+                    if (error.message.includes('account number')) {
+                        throw new Error('Account access issue. Please ensure your Schwab account has trading permissions and try reconnecting.');
+                    } else if (error.message.includes('401')) {
+                        throw new Error('Authentication expired. Please reconnect to Schwab.');
+                    } else if (error.message.includes('403')) {
+                        throw new Error('Trading not authorized. Please ensure your account has trading permissions.');
+                    } else if (error.message.includes('400')) {
+                        throw new Error('Invalid order data. Please check your order details.');
+                    }
+                    
                     throw error;
                 }
             }
@@ -1012,10 +1069,28 @@
                 const success = await window.schwabAPI.getTokens(authCode);
                 if (success) {
                     console.log('✅ Authentication successful');
-                    enableLiveMode();
-                    closeAuthModal();
-                    addLog('🎉 Successfully connected to Schwab Live Trading!', 'success');
-                    alert('✅ Successfully connected to Schwab!\n\nYou are now in LIVE TRADING MODE with real money.');
+                    addLog('✅ Authentication successful, testing account access...', 'info');
+                    
+                    // Test account access immediately after authentication
+                    try {
+                        await window.schwabAPI.getAccounts();
+                        console.log('✅ Account access verified');
+                        addLog('✅ Account access verified', 'success');
+                        
+                        enableLiveMode();
+                        closeAuthModal();
+                        addLog('🎉 Successfully connected to Schwab Live Trading!', 'success');
+                        alert('✅ Successfully connected to Schwab!\n\nYou are now in LIVE TRADING MODE with real money.');
+                    } catch (accountError) {
+                        console.error('❌ Account access failed:', accountError);
+                        addLog(`❌ Account access failed: ${accountError.message}`, 'error');
+                        
+                        // Still enable live mode but warn user
+                        enableLiveMode();
+                        closeAuthModal();
+                        
+                        alert(`⚠️ Connected to Schwab but account access limited!\n\nError: ${accountError.message}\n\nPossible solutions:\n1. Ensure your account has trading permissions\n2. Try reconnecting\n3. Contact Schwab support if issue persists\n\nDemo mode recommended for now.`);
+                    }
                 } else {
                     throw new Error('Authentication failed - please try again');
                 }
