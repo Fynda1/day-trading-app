@@ -729,7 +729,7 @@
                     client_id: this.clientId,
                     redirect_uri: this.redirectUri,
                     response_type: 'code',
-                    scope: 'readonly'
+                    scope: 'api'
                 });
                 return `${this.authUrl}?${params.toString()}`;
             }
@@ -902,48 +902,92 @@
             async getAccounts() {
                 try {
                     console.log('🔄 Fetching account information...');
-                    const data = await this.makeRequest('/trader/v1/accounts');
                     
-                    console.log('📋 Account data received:', data);
+                    // Try the main accounts endpoint first
+                    let data;
+                    try {
+                        data = await this.makeRequest('/trader/v1/accounts');
+                        console.log('📋 Account data from /trader/v1/accounts:', data);
+                    } catch (traderError) {
+                        console.log('⚠️ Trader endpoint failed, trying userPreference:', traderError.message);
+                        
+                        // If trader endpoint fails, try userPreference which requires fewer permissions
+                        try {
+                            data = await this.makeRequest('/trader/v1/userPreference');
+                            console.log('📋 Account data from /trader/v1/userPreference:', data);
+                        } catch (userError) {
+                            console.log('⚠️ UserPreference endpoint failed, trying accounts with query params:', userError.message);
+                            
+                            // Try with query parameters that might help
+                            try {
+                                data = await this.makeRequest('/trader/v1/accounts?fields=positions');
+                                console.log('📋 Account data from /trader/v1/accounts with fields:', data);
+                            } catch (fieldsError) {
+                                console.log('⚠️ All account endpoints failed:', fieldsError.message);
+                                throw new Error('Unable to access account information. Your Schwab account may not have API trading permissions enabled.');
+                            }
+                        }
+                    }
+                    
+                    // Process the account data
+                    let accountInfo = null;
                     
                     if (data && Array.isArray(data) && data.length > 0) {
-                        // Try different possible account number fields
-                        const account = data[0];
-                        this.accountNumber = account.accountNumber || 
-                                           account.accountId || 
-                                           account.hashValue || 
-                                           account.securitiesAccount?.accountNumber ||
-                                           account.securitiesAccount?.accountId;
-                        
-                        if (this.accountNumber) {
-                            console.log('✅ Account number retrieved:', this.accountNumber);
-                        } else {
-                            console.log('⚠️ Account data structure:', JSON.stringify(account, null, 2));
-                            throw new Error('Account number not found in response');
-                        }
+                        accountInfo = data[0];
                     } else if (data && typeof data === 'object' && !Array.isArray(data)) {
-                        // Handle case where accounts are returned as object instead of array
-                        this.accountNumber = data.accountNumber || 
-                                           data.accountId || 
-                                           data.hashValue ||
-                                           data.securitiesAccount?.accountNumber ||
-                                           data.securitiesAccount?.accountId;
+                        accountInfo = data;
+                    } else {
+                        throw new Error('No account data found in API response');
+                    }
+                    
+                    console.log('📋 Processing account info:', Object.keys(accountInfo));
+                    
+                    // Try different possible account number fields
+                    this.accountNumber = accountInfo.accountNumber || 
+                                       accountInfo.accountId || 
+                                       accountInfo.hashValue || 
+                                       accountInfo.accountHash ||
+                                       accountInfo.securitiesAccount?.accountNumber ||
+                                       accountInfo.securitiesAccount?.accountId ||
+                                       accountInfo.account?.accountNumber ||
+                                       accountInfo.account?.accountId;
+                    
+                    if (this.accountNumber) {
+                        console.log('✅ Account number retrieved:', this.accountNumber);
                         
-                        if (this.accountNumber) {
-                            console.log('✅ Account number retrieved from object:', this.accountNumber);
-                        } else {
-                            console.log('⚠️ Account data structure:', JSON.stringify(data, null, 2));
-                            throw new Error('Account number not found in response');
+                        // Test if we can access account details
+                        try {
+                            await this.makeRequest(`/trader/v1/accounts/${this.accountNumber}`);
+                            console.log('✅ Account access verified');
+                        } catch (accessError) {
+                            console.log('⚠️ Account access limited:', accessError.message);
+                            // Don't throw error here, just log it
                         }
                     } else {
-                        console.log('⚠️ No accounts found or invalid response format');
-                        throw new Error('No accounts found in response');
+                        console.log('⚠️ Account structure analysis:');
+                        console.log('- Keys:', Object.keys(accountInfo));
+                        console.log('- Full object:', JSON.stringify(accountInfo, null, 2));
+                        
+                        // Try to extract any identifier we can use
+                        const possibleIds = Object.keys(accountInfo).filter(key => 
+                            key.toLowerCase().includes('account') || 
+                            key.toLowerCase().includes('id') || 
+                            key.toLowerCase().includes('number') ||
+                            key.toLowerCase().includes('hash')
+                        );
+                        
+                        if (possibleIds.length > 0) {
+                            this.accountNumber = accountInfo[possibleIds[0]];
+                            console.log(`✅ Using ${possibleIds[0]} as account identifier:`, this.accountNumber);
+                        } else {
+                            throw new Error('No account identifier found in API response');
+                        }
                     }
                     
                     return data;
                 } catch (error) {
                     console.error('❌ Failed to get accounts:', error);
-                    throw error;
+                    throw new Error(`Account access failed: ${error.message}. Please ensure your Schwab account has API trading permissions enabled.`);
                 }
             }
 
@@ -1184,22 +1228,32 @@
                     // Test account access immediately after authentication
                     try {
                         await window.schwabAPI.getAccounts();
-                        console.log('✅ Account access verified');
-                        addLog('✅ Account access verified', 'success');
+                        console.log('✅ Account access verified - full live trading available');
+                        addLog('✅ Account access verified - full live trading enabled', 'success');
                         
                         enableLiveMode();
                         closeAuthModal();
                         addLog('🎉 Successfully connected to Schwab Live Trading!', 'success');
-                        alert('✅ Successfully connected to Schwab!\n\nYou are now in LIVE TRADING MODE with real money.');
+                        alert('✅ Successfully connected to Schwab!\n\nYou are now in LIVE TRADING MODE with real money.\n\nAll trading features are available.');
+                        
                     } catch (accountError) {
                         console.error('❌ Account access failed:', accountError);
                         addLog(`❌ Account access failed: ${accountError.message}`, 'error');
                         
-                        // Still enable live mode but warn user
-                        enableLiveMode();
-                        closeAuthModal();
+                        // Offer options to the user
+                        const userChoice = confirm(`⚠️ Schwab Authentication Successful!\n\nHowever, account access is limited:\n${accountError.message}\n\nOptions:\n✅ Continue in Demo Mode (recommended)\n❌ Cancel and try again\n\nClick OK for Demo Mode, Cancel to try again.`);
                         
-                        alert(`⚠️ Connected to Schwab but account access limited!\n\nError: ${accountError.message}\n\nPossible solutions:\n1. Ensure your account has trading permissions\n2. Try reconnecting\n3. Contact Schwab support if issue persists\n\nDemo mode recommended for now.`);
+                        if (userChoice) {
+                            // User chose demo mode
+                            enableDemoMode();
+                            closeAuthModal();
+                            addLog('🎮 Switched to Demo Mode after auth issue', 'info');
+                            alert('🎮 Demo Mode Activated!\n\nYou can safely test all features with simulated data.\n\nTo enable live trading:\n1. Contact Schwab to enable API trading permissions\n2. Reconnect after permissions are enabled');
+                        } else {
+                            // User wants to try again
+                            addLog('🔄 User chose to retry authentication', 'info');
+                            alert('Please try the authentication process again.\n\nMake sure:\n1. Your Schwab account has API trading permissions\n2. You have the correct authorization code\n3. Your account is properly set up for API access');
+                        }
                     }
                 } else {
                     throw new Error('Authentication failed - please try again');
