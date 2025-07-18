@@ -26,8 +26,9 @@
             display: flex; flex-direction: column; align-items: flex-start;
         }
         .datetime-display {
-            font-size: 14px; color: #4facfe; font-weight: bold;
+            font-size: 18px; color: #ffffff; font-weight: bold;
             margin-top: 5px; letter-spacing: 0.5px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
         }
         h1 { font-size: 2.2em; color: #4facfe; }
         .connection-status {
@@ -136,24 +137,58 @@
             width: 100%; height: 100%;
             background: linear-gradient(45deg, rgba(79, 172, 254, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%);
             border-radius: 8px; position: relative;
-            display: flex; align-items: center; justify-content: center;
             border: 1px solid rgba(79, 172, 254, 0.3);
         }
         
+        .chart-canvas {
+            width: 100%; height: 100%; position: relative;
+            display: flex; flex-direction: column;
+        }
+        
+        .chart-header {
+            padding: 10px; text-align: center; font-weight: bold;
+            color: #4facfe; border-bottom: 1px solid rgba(79, 172, 254, 0.3);
+        }
+        
+        .chart-content {
+            flex: 1; position: relative; overflow: hidden;
+        }
+        
+        .price-bars {
+            display: flex; align-items: end; justify-content: space-around;
+            height: 200px; padding: 20px 10px;
+        }
+        
+        .price-bar {
+            width: 8px; background: linear-gradient(to top, #ef4444, #22c55e);
+            border-radius: 2px; transition: all 0.3s ease;
+            min-height: 20px; opacity: 0.8;
+        }
+        
+        .price-bar:hover { opacity: 1; transform: scaleX(1.5); }
+        
         .chart-placeholder {
             color: #4facfe; font-size: 16px; text-align: center;
-            padding: 20px; z-index: 2; position: relative;
+            padding: 80px 20px; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; flex-direction: column; justify-content: center;
         }
         
         .chart-data {
-            position: absolute; bottom: 10px; left: 10px;
-            font-size: 12px; color: #22c55e; z-index: 3;
+            position: absolute; bottom: 5px; left: 10px; right: 10px;
+            font-size: 12px; color: #22c55e; text-align: center;
+            background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 4px;
         }
         
         .price-line {
             position: absolute; top: 50%; left: 0; right: 0;
             height: 2px; background: #22c55e;
             animation: pricePulse 2s infinite;
+        }
+        
+        .custom-ticker-input {
+            font-weight: 900 !important;
+            color: #000000 !important;
+            text-transform: uppercase;
         }
         
         @keyframes pricePulse {
@@ -230,18 +265,26 @@
         
         .running-pnl-panel {
             background: rgba(255, 255, 255, 0.08);
-            border-radius: 10px; padding: 15px; margin-bottom: 15px;
-            border: 2px solid rgba(79, 172, 254, 0.3);
+            border-radius: 15px; padding: 20px; margin-bottom: 15px;
+            border: 3px solid rgba(79, 172, 254, 0.5);
+            position: relative;
+        }
+        .selected-stock-display {
+            font-size: 24px; font-weight: 900; text-align: center;
+            margin-bottom: 12px; color: #4facfe;
+            text-transform: uppercase; letter-spacing: 1px;
+            text-shadow: 0 0 15px rgba(79, 172, 254, 0.6);
         }
         .running-pnl-value { 
-            font-size: 28px; font-weight: bold; text-align: center; 
-            margin-bottom: 8px; transition: all 0.3s ease;
+            font-size: 32px; font-weight: bold; text-align: center; 
+            margin-bottom: 10px; transition: all 0.3s ease;
         }
-        .running-pnl-positive { color: #22c55e; text-shadow: 0 0 10px rgba(34, 197, 94, 0.5); }
-        .running-pnl-negative { color: #ef4444; text-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+        .running-pnl-positive { color: #22c55e; text-shadow: 0 0 15px rgba(34, 197, 94, 0.7); }
+        .running-pnl-negative { color: #ef4444; text-shadow: 0 0 15px rgba(239, 68, 68, 0.7); }
         .running-pnl-details {
-            display: flex; justify-content: space-between; font-size: 12px;
-            margin-top: 8px;
+            display: flex; justify-content: space-between; font-size: 13px;
+            margin-top: 10px; padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
         }
         
         .watchlist-edit-panel {
@@ -422,7 +465,7 @@
 
                 <div class="form-group">
                     <label for="customTicker">Or Enter Custom Stock Symbol:</label>
-                    <input type="text" id="customTicker" placeholder="e.g., COIN, GME">
+                    <input type="text" id="customTicker" class="custom-ticker-input" placeholder="e.g., COIN, GME">
                 </div>
 
                 <div class="form-group">
@@ -494,18 +537,29 @@
 
                 <div class="chart-container">
                     <div class="chart-display" id="chartDisplay">
-                        <div class="chart-placeholder" id="chartPlaceholder">
-                            <div>📊 Live Chart for <span id="chartSymbol">Select a stock</span></div>
-                            <div style="font-size: 14px; margin-top: 10px; opacity: 0.8;">
-                                Timeframe: <span id="currentTimeframe">1M</span>
+                        <div class="chart-canvas" id="chartCanvas" style="display: none;">
+                            <div class="chart-header" id="chartHeader">
+                                📊 LIVE CHART - LOADING...
                             </div>
-                            <div style="font-size: 12px; margin-top: 15px; color: #22c55e;">
-                                Select a stock to see live price action
+                            <div class="chart-content">
+                                <div class="price-bars" id="priceBars">
+                                    <!-- Price bars will be generated here -->
+                                </div>
                             </div>
                         </div>
-                        <div class="price-line" id="priceLine" style="display: none;"></div>
+                        
+                        <div class="chart-placeholder" id="chartPlaceholder">
+                            <div>📊 Market Analysis Chart</div>
+                            <div style="font-size: 14px; margin-top: 10px; opacity: 0.8;">
+                                Select a stock to view live price chart
+                            </div>
+                            <div style="font-size: 12px; margin-top: 15px; color: #22c55e;">
+                                Charts update in real-time with price movements
+                            </div>
+                        </div>
+                        
                         <div class="chart-data" id="chartData" style="display: none;">
-                            Price: $0.00 | Volume: 0
+                            Price: $0.00 | Volume: 0 | Timeframe: 1M
                         </div>
                     </div>
                 </div>
@@ -538,6 +592,9 @@
                 </div>
 
                 <div class="running-pnl-panel">
+                    <div class="selected-stock-display" id="selectedStockDisplay">
+                        NO STOCK SELECTED
+                    </div>
                     <div class="indicator-label">Running P&L</div>
                     <div class="running-pnl-value" id="runningPnL">$0.00</div>
                     <div class="running-pnl-details">
@@ -1533,8 +1590,7 @@
             document.querySelectorAll('.chart-btn').forEach(btn => btn.classList.remove('active'));
             buttonElement.classList.add('active');
             
-            // Update displays
-            document.getElementById('currentTimeframe').textContent = timeframe.toUpperCase();
+            // Update chart with new timeframe
             updateChart();
             addLog(`📊 Chart timeframe changed to ${timeframe.toUpperCase()}`, 'info');
         }
@@ -1560,6 +1616,7 @@
                 if (currentTicker) {
                     updateCurrentPrice();
                     updateIndicators();
+                    updateChart(); // Update chart with new price data
                 }
                 
                 // Update watchlist prices
